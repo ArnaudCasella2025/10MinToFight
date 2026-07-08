@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+*.tsbuildinfo
+
+# Runtime-generated caches: per-device workout history and generated exercise
+# illustrations. Regenerated automatically; not meant to be committed.
+data/history/*.json
+data/images/*.png
+!data/history/.gitkeep
+!data/images/.gitkeep
