@@ -78,6 +78,21 @@ Par défaut, l'app appelle le backend sur `http://localhost:3000`. Pour tester s
 physique ou pointer vers un backend déployé, changez `expo.extra.apiBaseUrl` dans `app/app.json`
 (ou définissez la variable d'env `EXPO_PUBLIC_API_BASE_URL`).
 
+## Déploiement du backend et notification 7h
+
+Pour ne jamais avoir à lancer le serveur en local, déployez-le une fois sur un hébergeur
+(Render, Railway, Fly.io...) et pointez `apiBaseUrl` vers son URL publique.
+
+Les hébergeurs gratuits mettent souvent le service en veille après une période d'inactivité
+(ex. ~15 min sur Render), ce qui provoque un temps de démarrage de 30-50s au réveil. Comme la
+notification quotidienne à 7h est programmée par l'OS du téléphone (pas par du code qui tourne
+en tâche de fond), elle ne peut pas réveiller le serveur elle-même. Pour que le serveur soit déjà
+chaud quand l'utilisateur ouvre l'app, un workflow GitHub Actions
+(`.github/workflows/keep-server-warm.yml`) ping `/api/health` toutes les 10 minutes,
+indépendamment du téléphone. Pour l'activer : dans GitHub → Settings → Secrets and variables →
+Actions → Variables, ajoutez une variable `SERVER_URL` avec l'URL de votre backend déployé
+(ex. `https://10mintofight.onrender.com`).
+
 ## Limites connues / suites possibles
 
 - Testé dans cet environnement via typecheck (`tsc --noEmit`) et export Metro (`expo export
