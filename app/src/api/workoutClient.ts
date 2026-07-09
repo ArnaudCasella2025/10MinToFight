@@ -4,7 +4,9 @@ import { cacheWorkout, getCachedWorkout } from "../storage/workoutCache";
 import { getOrCreateDeviceId } from "../storage/deviceId";
 import { Workout } from "../types/workout";
 
-const REQUEST_TIMEOUT_MS = 8000;
+// Generous timeout: a free-tier backend that's been asleep can take 30-50s to
+// cold-start on its first request after a period of inactivity.
+const REQUEST_TIMEOUT_MS = 60000;
 
 export function todayIso(): string {
   return new Date().toISOString().slice(0, 10);

@@ -25,6 +25,9 @@ export function HomeScreen({ workout, loading, refreshing, onRefresh, onStart }:
       <View style={styles.center}>
         <ActivityIndicator size="large" color="#E63946" />
         <Text style={styles.loadingText}>Préparation de ton entraînement du jour...</Text>
+        <Text style={styles.loadingHint}>
+          Ça peut prendre jusqu'à une minute la 1ère fois de la journée le temps que le serveur se réveille.
+        </Text>
       </View>
     );
   }
@@ -91,6 +94,12 @@ const styles = StyleSheet.create({
     marginTop: 12,
     fontSize: 16,
     color: "#555",
+    textAlign: "center",
+  },
+  loadingHint: {
+    marginTop: 8,
+    fontSize: 13,
+    color: "#999",
     textAlign: "center",
   },
   title: {

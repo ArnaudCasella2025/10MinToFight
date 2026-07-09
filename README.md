@@ -84,14 +84,14 @@ Pour ne jamais avoir à lancer le serveur en local, déployez-le une fois sur un
 (Render, Railway, Fly.io...) et pointez `apiBaseUrl` vers son URL publique.
 
 Les hébergeurs gratuits mettent souvent le service en veille après une période d'inactivité
-(ex. ~15 min sur Render), ce qui provoque un temps de démarrage de 30-50s au réveil. Comme la
-notification quotidienne à 7h est programmée par l'OS du téléphone (pas par du code qui tourne
-en tâche de fond), elle ne peut pas réveiller le serveur elle-même. Pour que le serveur soit déjà
-chaud quand l'utilisateur ouvre l'app, un workflow GitHub Actions
-(`.github/workflows/keep-server-warm.yml`) ping `/api/health` toutes les 10 minutes,
-indépendamment du téléphone. Pour l'activer : dans GitHub → Settings → Secrets and variables →
-Actions → Variables, ajoutez une variable `SERVER_URL` avec l'URL de votre backend déployé
-(ex. `https://10mintofight.onrender.com`).
+(ex. ~15 min sur Render), ce qui provoque un temps de démarrage de 30-50s au réveil. La
+notification quotidienne à 7h est programmée par l'OS du téléphone, indépendamment du serveur :
+elle s'affiche à l'heure même si le backend dort, et c'est seulement à l'ouverture de l'app que
+la requête part. Choix assumé ici : plutôt que de bricoler un ping externe pour maintenir le
+serveur éveillé (coûteux en quota gratuit, pas fiable à 100%), l'app affiche simplement un message
+d'attente et patiente jusqu'à 60s le temps que le serveur se réveille — acceptable pour un usage
+1x/jour. Si ce délai occasionnel dérange, les alternatives sont un hébergeur avec une offre
+"toujours actif" sans mise en veille (ex. Fly.io) ou un petit forfait payant (~5-7€/mois).
 
 ## Limites connues / suites possibles
 
