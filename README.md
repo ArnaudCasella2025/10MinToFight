@@ -22,9 +22,10 @@ Une notification locale propose un nouvel entraînement tous les matins à 7h.
 - Une bibliothèque de ~44 exercices sans équipement est définie dans
   `server/src/data/exercises.ts`, répartie en 4 catégories avec un quota fixe par
   entraînement (3 cardio, 3 muscu haut du corps, 2 étirements, 2 arts martiaux).
-- Si une clé `ANTHROPIC_API_KEY` est configurée, le serveur demande à Claude de choisir les
-  10 exercices du jour (en respectant les quotas et en variant par rapport à l'historique
-  récent de l'appareil).
+- Si une clé `LLM_API_KEY` est configurée, le serveur demande à un LLM (par défaut via l'API
+  compatible OpenAI de [Mammouth AI](https://mammouth.ai), configurable via `LLM_BASE_URL` /
+  `LLM_MODEL`) de choisir les 10 exercices du jour, en respectant les quotas et en variant par
+  rapport à l'historique récent de l'appareil.
 - Sinon (ou si l'appel échoue), un générateur local déterministe prend le relais : il choisit
   les exercices avec les mêmes règles, sans dépendre d'aucune API.
 - L'historique par appareil (`server/data/history/<deviceId>.json`) sert à éviter de répéter
@@ -99,8 +100,9 @@ d'attente et patiente jusqu'à 60s le temps que le serveur se réveille — acce
   --platform ios`), qui compilent et bundlent sans erreur ; il n'a pas été possible de lancer un
   simulateur iOS/Android réel ici pour valider visuellement l'UI — à vérifier avec Expo Go ou un
   simulateur avant mise en production.
-- La génération d'images (OpenAI) et la génération de l'entraînement par LLM (Claude) sont
-  optionnelles : sans clés, l'app reste pleinement fonctionnelle grâce aux générateurs locaux.
+- La génération d'images (OpenAI) et la génération de l'entraînement par LLM (Mammouth AI ou tout
+  autre endpoint compatible OpenAI) sont optionnelles : sans clés, l'app reste pleinement
+  fonctionnelle grâce aux générateurs locaux.
 - Pour une notification 7h fiable même après redémarrage du téléphone, l'utilisateur doit avoir
   lancé l'app au moins une fois pour accorder la permission de notification (demandée
   automatiquement au premier lancement).
