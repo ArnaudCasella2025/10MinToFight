@@ -39,7 +39,7 @@
       ]
     ],
     "extra": {
-      "apiBaseUrl": "http://localhost:3000"
+      "apiBaseUrl": "https://one0mintofight.onrender.com"
     }
   }
 }
