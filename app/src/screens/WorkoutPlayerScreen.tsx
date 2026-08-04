@@ -3,8 +3,7 @@ import { useKeepAwake } from "expo-keep-awake";
 import React, { useEffect, useRef, useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { playExerciseStartCue, playExerciseStopCue, playWorkoutCompleteCue } from "../audio/cues";
-import { exerciseImageUrl } from "../api/workoutClient";
-import { ExerciseVisual } from "../components/ExerciseVisual";
+import { CategoryIcon } from "../components/CategoryIcon";
 import { Timer } from "../components/Timer";
 import { CATEGORY_LABELS, DISCIPLINE_LABELS, Workout } from "../types/workout";
 
@@ -75,7 +74,7 @@ export function WorkoutPlayerScreen({ workout, onFinish, onExit }: Props) {
         Exercice {index + 1} / {workout.exercises.length}
       </Text>
 
-      <ExerciseVisual imageUrl={exerciseImageUrl(exercise.imageUrl)} category={exercise.category} />
+      <CategoryIcon category={exercise.category} size={220} />
 
       <Text style={styles.name}>{exercise.name}</Text>
       <Text style={styles.category}>

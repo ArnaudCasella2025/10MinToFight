@@ -11,7 +11,7 @@ Une notification locale propose un nouvel entraînement tous les matins à 7h.
 
 ```
 10MinToFight/
-├── server/   Backend Node/TypeScript : génère l'entraînement du jour et sert les visuels d'exercice
+├── server/   Backend Node/TypeScript : génère l'entraînement du jour
 └── app/      Application mobile Expo/React Native (TypeScript)
 ```
 
@@ -30,21 +30,12 @@ Une notification locale propose un nouvel entraînement tous les matins à 7h.
 - L'historique par appareil (`server/data/history/<deviceId>.json`) sert à éviter de répéter
   les mêmes exercices d'un jour à l'autre et à faire tourner les disciplines d'arts martiaux.
 
-### Visuels d'exercice
-
-- `GET /api/exercises/:slug/image` sert l'illustration en cache si l'exercice a déjà été
-  illustré (fichier dans `server/data/images/`), sinon la génère via l'API d'images d'OpenAI
-  (si `OPENAI_API_KEY` est configurée) puis la met en cache pour toutes les prochaines fois
-  que cet exercice apparaît dans un entraînement.
-- Sans clé configurée, l'endpoint répond 404 et l'application affiche une icône de catégorie
-  à la place.
-
 ### Application mobile (`app/`)
 
 - Écran d'accueil : liste des 10 exercices du jour, bouton "Démarrer".
 - Écran d'entraînement : pour chaque exercice, nom, description détaillée ("comment bien le
-  faire"), visuel, minuteur de 45s / 15s qui sonne au début et à la fin de chaque exercice
-  (fichiers sons synthétisés localement, voir `app/scripts/generate-sounds.js`).
+  faire"), icône de catégorie, minuteur de 45s / 15s qui sonne au début et à la fin de chaque
+  exercice (fichiers sons synthétisés localement, voir `app/scripts/generate-sounds.js`).
 - Écran de récapitulatif en fin d'entraînement.
 - Notification locale quotidienne à 7h (`expo-notifications`), programmée au premier lancement.
 - Résilience réseau : l'entraînement du jour est mis en cache localement (AsyncStorage) ; si le
@@ -61,8 +52,7 @@ npm run dev             # serveur de dev avec rechargement automatique
 # ou : npm run build && npm start
 ```
 
-Sans aucune clé API renseignée, le serveur fonctionne déjà complètement (génération locale +
-icônes de catégorie à la place des visuels).
+Sans clé API renseignée, le serveur fonctionne déjà complètement en mode génération locale.
 
 ## Lancer l'application mobile
 
@@ -99,8 +89,8 @@ d'attente et patiente jusqu'à 60s le temps que le serveur se réveille — acce
   --platform ios`), qui compilent et bundlent sans erreur ; il n'a pas été possible de lancer un
   simulateur iOS/Android réel ici pour valider visuellement l'UI — à vérifier avec Expo Go ou un
   simulateur avant mise en production.
-- La génération d'images (OpenAI) et la génération de l'entraînement par LLM (Claude) sont
-  optionnelles : sans clés, l'app reste pleinement fonctionnelle grâce aux générateurs locaux.
+- La génération de l'entraînement par LLM (Claude) est optionnelle : sans clé, l'app reste
+  pleinement fonctionnelle grâce au générateur local.
 - Pour une notification 7h fiable même après redémarrage du téléphone, l'utilisateur doit avoir
   lancé l'app au moins une fois pour accorder la permission de notification (demandée
   automatiquement au premier lancement).

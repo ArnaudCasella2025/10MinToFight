@@ -21,7 +21,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "tronc gainé et atterrissez en souplesse.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "push-ups",
@@ -34,7 +33,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "Genoux au sol si besoin.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "high-knees",
@@ -46,7 +44,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "bras en balancier comme en course, restez sur la pointe des pieds.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "plank",
@@ -58,7 +55,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "Contractez abdominaux et fessiers, ne laissez ni le bassin tomber ni les fesses monter.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "boxing-jab-cross",
@@ -71,7 +67,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "pivotant légèrement les hanches à chaque coup, et revenez en garde entre chaque frappe.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "mountain-climbers",
@@ -83,7 +78,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "alternant avec l'autre jambe, comme si vous couriez à l'horizontale. Gardez le bassin bas.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "bicycle-crunches",
@@ -95,7 +89,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "vers le genou gauche en tendant l'autre jambe, puis alternez comme si vous pédaliez.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "krav-maga-palm-strike",
@@ -108,7 +101,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "l'avant en extension complète du bras, en poussant sur la jambe arrière, puis revenez en garde.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "standing-hamstring-stretch",
@@ -120,7 +112,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "vers l'avant à partir des hanches, dos droit, jusqu'à sentir l'étirement derrière la cuisse.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
       {
         slug: "childs-pose",
@@ -132,7 +123,6 @@ export function buildEmergencyWorkout(date: string): Workout {
           "devant vous, front au sol. Laissez le bas du dos s'allonger et respirez profondément.",
         workSeconds: 45,
         restSeconds: 15,
-        imageUrl: null,
       },
     ],
   };

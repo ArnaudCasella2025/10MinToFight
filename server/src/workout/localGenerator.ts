@@ -116,7 +116,6 @@ export function generateLocalWorkout(date: string, deviceId: string, recentSlugs
     description: exercise.description,
     workSeconds: WORK_SECONDS,
     restSeconds: REST_SECONDS,
-    imageUrl: null,
   }));
 
   return { date, source: "local", exercises };

@@ -126,7 +126,6 @@ export async function generateLlmWorkout(
         description: exercise.description,
         workSeconds: WORK_SECONDS,
         restSeconds: REST_SECONDS,
-        imageUrl: null,
       });
     }
 

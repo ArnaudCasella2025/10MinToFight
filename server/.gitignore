@@ -3,9 +3,7 @@ dist/
 .env
 *.tsbuildinfo
 
-# Runtime-generated caches: per-device workout history and generated exercise
-# illustrations. Regenerated automatically; not meant to be committed.
+# Runtime-generated cache: per-device workout history. Regenerated
+# automatically; not meant to be committed.
 data/history/*.json
-data/images/*.png
 !data/history/.gitkeep
-!data/images/.gitkeep

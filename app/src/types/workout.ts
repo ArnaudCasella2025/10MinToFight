@@ -11,7 +11,6 @@ export interface WorkoutExercise {
   description: string;
   workSeconds: number;
   restSeconds: number;
-  imageUrl: string | null;
 }
 
 export interface Workout {

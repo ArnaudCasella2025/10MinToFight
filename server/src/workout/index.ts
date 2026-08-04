@@ -4,16 +4,6 @@ import { generateLlmWorkout } from "./llmGenerator";
 import { generateLocalWorkout } from "./localGenerator";
 import { Workout, WorkoutExercise } from "./types";
 
-function withImageUrls(workout: Workout): Workout {
-  return {
-    ...workout,
-    exercises: workout.exercises.map((exercise) => ({
-      ...exercise,
-      imageUrl: `/api/exercises/${exercise.slug}/image`,
-    })),
-  };
-}
-
 function toWorkoutExercise(slug: string): WorkoutExercise | undefined {
   const exercise = getExerciseBySlug(slug);
   if (!exercise) return undefined;
@@ -26,7 +16,6 @@ function toWorkoutExercise(slug: string): WorkoutExercise | undefined {
     description: exercise.description,
     workSeconds: WORK_SECONDS,
     restSeconds: REST_SECONDS,
-    imageUrl: null,
   };
 }
 
@@ -41,7 +30,7 @@ export async function getOrCreateWorkout(deviceId: string, date: string): Promis
     const exercises = existing.slugs
       .map(toWorkoutExercise)
       .filter((exercise): exercise is WorkoutExercise => Boolean(exercise));
-    return withImageUrls({ date, source: existing.source, exercises });
+    return { date, source: existing.source, exercises };
   }
 
   const recentSlugs = getRecentSlugs(deviceId, date);
@@ -56,5 +45,5 @@ export async function getOrCreateWorkout(deviceId: string, date: string): Promis
     workout.source,
   );
 
-  return withImageUrls(workout);
+  return workout;
 }
