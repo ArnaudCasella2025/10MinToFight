@@ -11,8 +11,11 @@ Une notification locale propose un nouvel entraînement tous les matins à 7h.
 
 ```
 10MinToFight/
-├── server/   Backend Node/TypeScript : génère l'entraînement du jour et sert les visuels d'exercice
-└── app/      Application mobile Expo/React Native (TypeScript)
+├── server/           Backend Node/TypeScript : génère l'entraînement du jour et sert les visuels d'exercice
+├── app/              Application mobile Expo/React Native (TypeScript)
+└── youtube-summary/  Web app indépendante : résumé + fiabilité + chat IA sur une vidéo YouTube
+    ├── server/       Backend Node/TypeScript (transcript, résumé, fiabilité, chat)
+    └── web/          Frontend Vite/React (TypeScript)
 ```
 
 ## Comment ça fonctionne
@@ -77,6 +80,59 @@ Scannez le QR code avec l'app Expo Go (Android/iOS), ou lancez un simulateur (`n
 Par défaut, l'app appelle le backend sur `http://localhost:3000`. Pour tester sur un téléphone
 physique ou pointer vers un backend déployé, changez `expo.extra.apiBaseUrl` dans `app/app.json`
 (ou définissez la variable d'env `EXPO_PUBLIC_API_BASE_URL`).
+
+## Web app : résumé YouTube + fiabilité + chat IA (`youtube-summary/`)
+
+Application web indépendante de l'app mobile ci-dessus. On colle un lien YouTube, elle :
+
+1. Extrait l'ID de la vidéo et récupère ses sous-titres (`youtube-transcript`, sans clé API —
+   fonctionne avec les sous-titres auto-générés ou manuels, en français si disponibles).
+2. Envoie le transcript à Claude pour générer un résumé en points clés, une liste des
+   affirmations les plus notables, et une **note de fiabilité heuristique** (1 à 5) basée
+   uniquement sur des indices textuels : présence de sources citées, ton mesuré vs
+   sensationnaliste, distinction faits/opinions. Cette note n'est **pas** une vérification
+   factuelle indépendante — l'app le rappelle explicitement à l'écran (l'IA n'a pas accès à
+   internet pour vérifier les faits avancés dans la vidéo).
+3. Ouvre un chat pour poser des questions sur le contenu de la vidéo ; les réponses sont
+   contraintes au transcript (le modèle est instruit à dire "je ne sais pas" plutôt qu'inventer).
+
+### Lancer le backend (`youtube-summary/server/`)
+
+```bash
+cd youtube-summary/server
+cp .env.example .env   # renseigner ANTHROPIC_API_KEY (requis)
+npm install
+npm run dev             # http://localhost:3001
+```
+
+Sans `ANTHROPIC_API_KEY`, `/api/analyze` et `/api/chat` répondent 503 (la récupération du
+transcript, elle, ne nécessite aucune clé).
+
+### Lancer le frontend (`youtube-summary/web/`)
+
+```bash
+cd youtube-summary/web
+npm install
+npm run dev             # http://localhost:5173, proxy /api vers localhost:3001 en dev
+```
+
+Pour un déploiement où frontend et backend sont sur des origines différentes, définir
+`VITE_API_BASE_URL` (voir `youtube-summary/web/.env.example`) à l'URL du backend déployé.
+
+### Limites connues de ce module
+
+- Les sessions d'analyse (transcript + historique de chat) sont stockées **en mémoire** côté
+  serveur (expiration après 4h) — à remplacer par un store persistant pour un déploiement
+  multi-instances.
+- La récupération du transcript dépend du scraping public de YouTube (`youtube-transcript`) :
+  aucune clé API requise, mais peut échouer si YouTube modifie sa page, si les sous-titres sont
+  désactivés, ou si la vidéo est privée/restreinte — l'app affiche alors un message d'erreur clair.
+- Testé dans cet environnement via `tsc` (typecheck) et build de production (`vite build`) sur les
+  deux paquets, ainsi qu'un test visuel du flux complet (formulaire → résumé → fiabilité → chat)
+  avec des réponses API simulées : le bac à sable de développement utilisé ici bloque les accès
+  réseau sortants vers youtube.com, donc le flux réel bout-en-bout (vraie vidéo, vrai appel Claude)
+  n'a pas pu être vérifié depuis cet environnement — à tester avec une vraie clé Anthropic et un
+  accès réseau non restreint avant mise en production.
 
 ## Limites connues / suites possibles
 
