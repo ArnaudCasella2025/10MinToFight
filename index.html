@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f1115" />
+  <title>10 Min To Fight</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%A5%8A%3C/text%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ============================= ACCUEIL ============================= -->
+  <section id="home-screen" class="screen">
+    <header class="home-header">
+      <h1>10 Min To Fight</h1>
+      <p id="home-date" class="home-date"></p>
+      <p class="home-sub">10 exercices · 1 minute chacun · endurance, muscu, souplesse, combat</p>
+    </header>
+
+    <ul id="home-exercise-list" class="home-exercise-list"></ul>
+
+    <button id="start-button" class="btn btn-primary btn-start">Démarrer l'entraînement</button>
+  </section>
+
+  <!-- ============================ PLAYER =============================== -->
+  <section id="player-screen" class="screen">
+    <button id="quit-button" class="btn-quit">Quitter</button>
+
+    <p id="player-progress" class="player-progress"></p>
+
+    <div class="player-center">
+      <span id="player-pastille" class="pastille pastille-large"></span>
+      <h2 id="player-name" class="player-name"></h2>
+      <p id="player-description" class="player-description"></p>
+
+      <div class="timer-ring">
+        <span id="player-seconds" class="timer-seconds"></span>
+        <span id="player-phase-label" class="timer-phase"></span>
+      </div>
+
+      <p id="player-next" class="player-next"></p>
+    </div>
+  </section>
+
+  <!-- ============================ SUMMARY =============================== -->
+  <section id="summary-screen" class="screen">
+    <div class="summary-center">
+      <p class="summary-emoji">🥇</p>
+      <h2>Entraînement terminé !</h2>
+      <p class="summary-sub">Bravo, à demain pour le suivant.</p>
+      <ul id="summary-list" class="summary-list"></ul>
+      <button id="restart-button" class="btn btn-primary">Retour à l'accueil</button>
+    </div>
+  </section>
+
+  <script src="exercises.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
