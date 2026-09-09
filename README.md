@@ -1,19 +1,69 @@
 # 10 Min To Fight
 
-Appli mobile (Expo / React Native) qui génère chaque jour un entraînement de ~10 minutes,
-sans équipement : 10 exercices de 45 secondes avec 15 secondes de récupération, mêlant
-cardio, musculation (haut du corps), étirements (jambes / bas du dos) et techniques d'arts
-martiaux (boxe, muay thaï, kung fu, krav maga, jujitsu brésilien).
-
-Une notification locale propose un nouvel entraînement tous les matins à 7h.
+Génère chaque jour un entraînement intensif de 10 minutes, sans équipement : 10 exercices d'une
+minute (50s d'effort intense + 10s de récup), mêlant endurance, muscu, souplesse et combat.
 
 ## Structure du repo
 
 ```
 10MinToFight/
-├── server/   Backend Node/TypeScript : génère l'entraînement du jour
-└── app/      Application mobile Expo/React Native (TypeScript)
+├── web/      Version actuelle : page HTML/JS autonome, aucun serveur, aucune IA
+├── server/   Ancien prototype : backend Node/TypeScript (génération LLM)
+└── app/      Ancien prototype : appli mobile Expo/React Native
 ```
+
+`server/` et `app/` sont un premier prototype (génération par LLM + notifications natives)
+conservé pour référence, mais nécessitait un backend hébergé et un build mobile — voir plus bas.
+**`web/` est la version à utiliser aujourd'hui** : une seule page HTML qui tourne entièrement dans
+le navigateur, sans rien à déployer ni à builder.
+
+## `web/` — la version HTML autonome
+
+Aucun serveur, aucune clé API, aucune IA : tout tourne côté navigateur.
+
+### Utilisation
+
+Ouvrez `web/index.html` dans un navigateur (double-clic, ou servez le dossier avec n'importe quel
+serveur statique). Sur téléphone, le plus simple est d'héberger `web/` gratuitement (GitHub Pages,
+Netlify, Vercel...) et d'ajouter la page à l'écran d'accueil pour un rendu plein écran façon appli.
+
+### Comment ça fonctionne
+
+- **Bibliothèque d'exercices** (`web/exercises.js`) : ~50 exercices sans équipement répartis en 4
+  disciplines — endurance 🌬️ (bleu), muscu 💪 (rouge), souplesse 🧘‍♂️ (vert), combat 👊 (noir).
+- **Entraînement du jour** : généré par un algorithme local (seedé sur la date), toujours 10
+  exercices avec les 4 disciplines représentées, mélangées. Stable toute la journée (mis en cache
+  dans `localStorage`), différent le lendemain. Un historique local (7 derniers jours) évite de
+  répéter trop souvent les mêmes exercices.
+- **Minuteur** : chaque exercice dure 1 minute pile — 50s d'effort intense puis 10s de récup avec
+  annonce vocale du prochain exercice (Web Speech API). Bips synthétisés (Web Audio API, aucun
+  fichier audio) : un bip par seconde durant les 5 dernières secondes de l'effort (prévient
+  l'arrivée de la récup) et durant les 3 dernières secondes de la récup (prévient le prochain
+  effort), avec un bip plus aigu sur la toute dernière seconde de chaque compte à rebours.
+- **Pastilles de catégorie** : chaque exercice affiche sa discipline (rouge/bleu/noir/vert +
+  emoji) sur l'écran d'accueil et pendant l'entraînement.
+
+### Limites connues
+
+- Testé avec Playwright (Chromium headless) dans cet environnement : génération du jour (10
+  exercices, 4 catégories représentées, stable au rechargement), décompte des bips, transitions de
+  phase et annonces vocales vérifiés programmatiquement. Pas de test sur un vrai téléphone iOS/
+  Android — à faire avant usage quotidien, en particulier la synthèse vocale et l'audio qui
+  nécessitent un premier tap utilisateur pour se débloquer sur iOS Safari (déjà géré : le bouton
+  "Démarrer" déclenche ce déblocage).
+- Pas de notification quotidienne (contrairement à l'ancien prototype `app/`) : une page web seule
+  ne peut pas réveiller le téléphone à 7h. Pense à te faire un rappel de ton côté, ou demande-moi
+  d'explorer les notifications push web (PWA) si tu veux cette fonctionnalité plus tard.
+- « Sans IA » pour l'instant : l'algorithme de sélection est déterministe. La structure du code
+  (une fonction `generateWorkout(date)` isolée dans `web/app.js`) est prête à être remplacée par un
+  appel LLM plus tard si besoin.
+
+---
+
+## Ancien prototype : appli mobile Expo + backend
+
+Ce qui suit décrit `server/` et `app/`, la version précédente (génération par LLM, notifications
+natives, build mobile via EAS). Conservé pour référence.
 
 ## Comment ça fonctionne
 
