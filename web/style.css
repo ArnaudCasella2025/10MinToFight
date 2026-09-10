@@ -75,9 +75,25 @@ button:focus-visible {
 }
 
 /* ============================== ACCUEIL ================================ */
+.icon-button {
+  border: none;
+  background: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  padding: 0.4rem;
+  border-radius: 10px;
+}
+.icon-button:hover { background: var(--bg-raised); }
+
 .home-header {
+  position: relative;
   text-align: center;
   margin-bottom: 1.5rem;
+}
+.home-settings-button {
+  position: absolute;
+  top: 0;
+  right: 0;
 }
 .home-header h1 {
   font-size: 1.6rem;
@@ -141,9 +157,18 @@ button:focus-visible {
   background: var(--accent);
   color: #fff;
 }
-.btn-start {
-  width: 100%;
+.btn-secondary {
+  background: var(--bg-raised);
+  color: var(--ink);
+  border: 1px solid var(--line);
 }
+
+.home-actions {
+  display: flex;
+  gap: 0.6rem;
+}
+.home-actions .btn-primary { flex: 2; }
+.home-actions .btn-secondary { flex: 1; white-space: nowrap; }
 
 /* =============================== PLAYER ================================ */
 #player-screen {
@@ -263,4 +288,95 @@ button:focus-visible {
   padding: 0.5rem 0;
   border-bottom: 1px solid var(--line);
   font-size: 0.95rem;
+}
+
+/* ============================== SETTINGS ================================= */
+.settings-back {
+  align-self: flex-start;
+  padding-left: 0;
+}
+.settings-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0.4rem 0 0.3rem;
+}
+.settings-sub {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  margin: 0 0 0.5rem;
+  max-width: 40ch;
+}
+
+.radar-svg {
+  width: 100%;
+  max-width: 260px;
+  height: auto;
+  align-self: center;
+  margin: 0.5rem 0 1rem;
+}
+.radar-ring {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.radar-axis {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.radar-shape {
+  fill: rgba(230, 57, 70, 0.28); /* fallback for browsers without color-mix() */
+  fill: color-mix(in srgb, var(--accent) 28%, transparent);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.radar-dot {
+  fill: var(--accent);
+  stroke: var(--bg);
+  stroke-width: 1.5;
+}
+.radar-label {
+  font-size: 15px;
+}
+
+.settings-rows {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+  margin-bottom: 1.2rem;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+.settings-row-label {
+  flex: 1;
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+.stepper-btn {
+  width: 2.2rem;
+  height: 2.2rem;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--ink);
+  font-size: 1.2rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.stepper-btn:active { background: var(--line); }
+.stepper-value {
+  min-width: 1.4rem;
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
 }
