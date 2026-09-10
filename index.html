@@ -13,6 +13,7 @@
   <!-- ============================= ACCUEIL ============================= -->
   <section id="home-screen" class="screen">
     <header class="home-header">
+      <button id="settings-button" class="icon-button home-settings-button" aria-label="Paramètres">⚙️</button>
       <h1>10 Min To Fight</h1>
       <p id="home-date" class="home-date"></p>
       <p class="home-sub">10 exercices · 1 minute chacun · endurance, muscu, souplesse, combat</p>
@@ -20,7 +21,10 @@
 
     <ul id="home-exercise-list" class="home-exercise-list"></ul>
 
-    <button id="start-button" class="btn btn-primary btn-start">Démarrer l'entraînement</button>
+    <div class="home-actions">
+      <button id="regenerate-button" class="btn btn-secondary">🔄 Régénérer</button>
+      <button id="start-button" class="btn btn-primary">Démarrer l'entraînement</button>
+    </div>
   </section>
 
   <!-- ============================ PLAYER =============================== -->
@@ -52,6 +56,20 @@
       <ul id="summary-list" class="summary-list"></ul>
       <button id="restart-button" class="btn btn-primary">Retour à l'accueil</button>
     </div>
+  </section>
+
+  <!-- ============================ SETTINGS =============================== -->
+  <section id="settings-screen" class="screen">
+    <button id="settings-back-button" class="btn-quit settings-back">← Retour</button>
+
+    <h2 class="settings-title">Personnaliser l'entraînement</h2>
+    <p class="settings-sub">Règle le niveau de chaque discipline (0 = aucun exercice, 3 = priorité maximale).</p>
+
+    <svg id="radar-svg" class="radar-svg" viewBox="0 0 240 240" aria-hidden="true"></svg>
+
+    <div id="settings-rows" class="settings-rows"></div>
+
+    <button id="settings-save-button" class="btn btn-primary">Enregistrer</button>
   </section>
 
   <script src="exercises.js"></script>

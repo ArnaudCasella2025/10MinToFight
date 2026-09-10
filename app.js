@@ -20,6 +20,11 @@ const CATEGORIES = Object.keys(CATEGORY_META);
 
 const STORAGE_WORKOUT_PREFIX = "10mtf:workout:";
 const STORAGE_HISTORY_KEY = "10mtf:history";
+const STORAGE_PREFS_KEY = "10mtf:prefs";
+const STORAGE_VARIANT_PREFIX = "10mtf:variant:";
+
+const MAX_WEIGHT = 3;
+const DEFAULT_WEIGHTS = { endurance: 1, muscu: 1, souplesse: 1, combat: 1 };
 
 /* -------------------------------------------------------------------------
  * Utilitaires : date, RNG déterministe par jour, stockage local
@@ -98,6 +103,27 @@ function getRecentIds(beforeDate) {
   return seen;
 }
 
+function getPreferences() {
+  const stored = readJson(STORAGE_PREFS_KEY, null);
+  if (!stored) return { ...DEFAULT_WEIGHTS };
+  // merge with defaults so any new category added later doesn't end up undefined
+  return { ...DEFAULT_WEIGHTS, ...stored };
+}
+
+function savePreferences(weights) {
+  writeJson(STORAGE_PREFS_KEY, weights);
+}
+
+function getVariant(date) {
+  return readJson(STORAGE_VARIANT_PREFIX + date, 0);
+}
+
+function bumpVariant(date) {
+  const next = getVariant(date) + 1;
+  writeJson(STORAGE_VARIANT_PREFIX + date, next);
+  return next;
+}
+
 /* -------------------------------------------------------------------------
  * Génération de l'entraînement du jour
  * ---------------------------------------------------------------------- */
@@ -105,13 +131,38 @@ function exercisesByCategory(category) {
   return EXERCISES.filter((e) => e.category === category);
 }
 
-function pickQuotas(random) {
-  const quotas = { muscu: 2, endurance: 2, combat: 2, souplesse: 2 };
-  let remaining = WORKOUT_SIZE - CATEGORIES.length * 2;
-  while (remaining > 0) {
-    const cat = CATEGORIES[Math.floor(random() * CATEGORIES.length)];
-    quotas[cat]++;
-    remaining--;
+/**
+ * Répartit les WORKOUT_SIZE exercices entre catégories proportionnellement aux
+ * niveaux du radar (méthode du plus grand reste / Hamilton) : une catégorie à
+ * 0 n'obtient jamais de créneau, et par ex. muscu=1 / combat=3 donne un ratio
+ * 25% / 75% sur les 10 exercices.
+ */
+function computeQuotas(weights, random) {
+  let totalWeight = CATEGORIES.reduce((sum, cat) => sum + (weights[cat] || 0), 0);
+  const effectiveWeights = totalWeight > 0 ? weights : DEFAULT_WEIGHTS;
+  if (totalWeight <= 0) totalWeight = CATEGORIES.length;
+
+  const raw = CATEGORIES.map((cat) => {
+    const w = effectiveWeights[cat] || 0;
+    const exact = (w / totalWeight) * WORKOUT_SIZE;
+    return { cat, w, floor: Math.floor(exact), frac: exact - Math.floor(exact) };
+  });
+
+  const quotas = {};
+  let assigned = 0;
+  for (const r of raw) {
+    quotas[r.cat] = r.floor;
+    assigned += r.floor;
+  }
+
+  let remaining = WORKOUT_SIZE - assigned;
+  const candidates = seededShuffle(
+    raw.filter((r) => r.w > 0),
+    random,
+  ).sort((a, b) => b.frac - a.frac || b.w - a.w);
+
+  for (let i = 0; i < remaining && candidates.length > 0; i++) {
+    quotas[candidates[i % candidates.length].cat]++;
   }
   return quotas;
 }
@@ -123,13 +174,17 @@ function pickForCategory(category, count, recentIds, random) {
   return [...fresh, ...stale].slice(0, count);
 }
 
-function generateWorkout(date) {
-  const cached = readJson(STORAGE_WORKOUT_PREFIX + date, null);
-  if (cached) return cached;
+function generateWorkout(date, { force = false } = {}) {
+  if (!force) {
+    const cached = readJson(STORAGE_WORKOUT_PREFIX + date, null);
+    if (cached) return cached;
+  }
 
-  const random = mulberry32(hashSeed(date));
+  const variant = force ? bumpVariant(date) : getVariant(date);
+  const random = mulberry32(hashSeed(`${date}:${variant}`));
   const recentIds = getRecentIds(date);
-  const quotas = pickQuotas(random);
+  const weights = getPreferences();
+  const quotas = computeQuotas(weights, random);
 
   let selected = [];
   for (const category of CATEGORIES) {
@@ -203,6 +258,7 @@ const screens = {
   home: document.getElementById("home-screen"),
   player: document.getElementById("player-screen"),
   summary: document.getElementById("summary-screen"),
+  settings: document.getElementById("settings-screen"),
 };
 
 function showScreen(name) {
@@ -222,9 +278,22 @@ let todayWorkout = [];
 function renderHome() {
   const date = todayIso();
   todayWorkout = generateWorkout(date);
-
   document.getElementById("home-date").textContent = formatDateLong(date);
+  renderHomeList();
+}
 
+function formatDateLong(iso) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+}
+
+function regenerateWorkout() {
+  const date = todayIso();
+  todayWorkout = generateWorkout(date, { force: true });
+  renderHomeList();
+}
+
+function renderHomeList() {
   const list = document.getElementById("home-exercise-list");
   list.innerHTML = "";
   todayWorkout.forEach((exercise, index) => {
@@ -241,9 +310,100 @@ function renderHome() {
   });
 }
 
-function formatDateLong(iso) {
-  const d = new Date(iso + "T00:00:00");
-  return d.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+/* ---- Écran paramètres (radar de préférences) ---- */
+let draftWeights = getPreferences();
+
+function openSettings() {
+  draftWeights = getPreferences();
+  renderSettings();
+  showScreen("settings");
+}
+
+function adjustWeight(category, delta) {
+  const next = Math.min(MAX_WEIGHT, Math.max(0, (draftWeights[category] || 0) + delta));
+  draftWeights = { ...draftWeights, [category]: next };
+  renderSettings();
+}
+
+function saveSettings() {
+  savePreferences(draftWeights);
+  todayWorkout = generateWorkout(todayIso(), { force: true });
+  renderHome();
+  showScreen("home");
+}
+
+function renderSettings() {
+  const rows = document.getElementById("settings-rows");
+  rows.innerHTML = "";
+  CATEGORIES.forEach((category) => {
+    const meta = CATEGORY_META[category];
+    const value = draftWeights[category] || 0;
+    const row = document.createElement("div");
+    row.className = "settings-row";
+    row.innerHTML = `
+      ${pastilleHtml(category)}
+      <span class="settings-row-label">${meta.label}</span>
+      <div class="stepper">
+        <button type="button" class="stepper-btn" data-action="dec" data-cat="${category}" aria-label="Diminuer ${meta.label}">−</button>
+        <span class="stepper-value">${value}</span>
+        <button type="button" class="stepper-btn" data-action="inc" data-cat="${category}" aria-label="Augmenter ${meta.label}">+</button>
+      </div>
+    `;
+    rows.appendChild(row);
+  });
+
+  rows.querySelectorAll(".stepper-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const delta = btn.dataset.action === "inc" ? 1 : -1;
+      adjustWeight(btn.dataset.cat, delta);
+    });
+  });
+
+  renderRadar(draftWeights);
+}
+
+function renderRadar(weights) {
+  const svg = document.getElementById("radar-svg");
+  const cx = 120;
+  const cy = 120;
+  const maxRadius = 88;
+  const axisCount = CATEGORIES.length;
+
+  function pointFor(index, value) {
+    const angle = -Math.PI / 2 + index * ((2 * Math.PI) / axisCount);
+    const radius = (value / MAX_WEIGHT) * maxRadius;
+    return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
+  }
+
+  let svgContent = "";
+
+  // Anneaux de fond (échelle 0..MAX_WEIGHT)
+  for (let ring = 1; ring <= MAX_WEIGHT; ring++) {
+    const points = CATEGORIES.map((_, i) => pointFor(i, ring).join(",")).join(" ");
+    svgContent += `<polygon points="${points}" class="radar-ring" />`;
+  }
+
+  // Axes
+  CATEGORIES.forEach((_, i) => {
+    const [x, y] = pointFor(i, MAX_WEIGHT);
+    svgContent += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="radar-axis" />`;
+  });
+
+  // Polygone des valeurs actuelles
+  const valuePoints = CATEGORIES.map((cat, i) => pointFor(i, weights[cat] || 0).join(",")).join(" ");
+  svgContent += `<polygon points="${valuePoints}" class="radar-shape" />`;
+  CATEGORIES.forEach((cat, i) => {
+    const [x, y] = pointFor(i, weights[cat] || 0);
+    svgContent += `<circle cx="${x}" cy="${y}" r="4" class="radar-dot radar-dot-${cat}" />`;
+  });
+
+  // Labels (emoji) au-delà de l'anneau externe
+  CATEGORIES.forEach((cat, i) => {
+    const [x, y] = pointFor(i, MAX_WEIGHT + 0.65);
+    svgContent += `<text x="${x}" y="${y}" class="radar-label" text-anchor="middle" dominant-baseline="middle">${CATEGORY_META[cat].emoji}</text>`;
+  });
+
+  svg.innerHTML = svgContent;
 }
 
 /* ---- Écran d'entraînement (player) ---- */
@@ -368,6 +528,10 @@ document.getElementById("restart-button").addEventListener("click", () => {
   showScreen("home");
   renderHome();
 });
+document.getElementById("regenerate-button").addEventListener("click", regenerateWorkout);
+document.getElementById("settings-button").addEventListener("click", openSettings);
+document.getElementById("settings-back-button").addEventListener("click", () => showScreen("home"));
+document.getElementById("settings-save-button").addEventListener("click", saveSettings);
 
 renderHome();
 showScreen("home");
