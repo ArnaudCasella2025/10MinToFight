@@ -90,10 +90,12 @@ button:focus-visible {
   text-align: center;
   margin-bottom: 1.5rem;
 }
-.home-settings-button {
+.home-header-actions {
   position: absolute;
   top: 0;
   right: 0;
+  display: flex;
+  gap: 0.2rem;
 }
 .home-header h1 {
   font-size: 1.6rem;
@@ -138,11 +140,35 @@ button:focus-visible {
   font-weight: 700;
   font-size: 0.98rem;
 }
+.home-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.15rem;
+}
 .home-row-category {
   font-size: 0.78rem;
   color: var(--ink-soft);
-  margin-top: 0.1rem;
 }
+
+/* ============================= JAUGE DE DIFFICULTÉ ===================== */
+.diff-gauge {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+.diff-bar {
+  display: inline-block;
+  width: 3px;
+  background: var(--line);
+  border-radius: 1px;
+}
+.diff-bar:nth-child(1) { height: 40%; }
+.diff-bar:nth-child(2) { height: 60%; }
+.diff-bar:nth-child(3) { height: 80%; }
+.diff-bar:nth-child(4) { height: 100%; }
+.diff-bar.filled { background: var(--accent); }
 
 .btn {
   border: none;
@@ -212,6 +238,16 @@ button:focus-visible {
   margin: 0.4rem 0 0;
   text-wrap: balance;
 }
+.player-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.player-category {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-weight: 600;
+}
 .player-description {
   color: var(--ink-soft);
   font-size: 0.95rem;
@@ -272,7 +308,16 @@ button:focus-visible {
 }
 .summary-sub {
   color: var(--ink-soft);
-  margin: 0 0 1.4rem;
+  margin: 0 0 0.6rem;
+}
+.summary-score-line {
+  color: var(--ink);
+  font-size: 0.95rem;
+  margin: 0 0 1.2rem;
+}
+.summary-score-line strong {
+  color: var(--accent);
+  font-size: 1.2rem;
 }
 .summary-list {
   list-style: none;
@@ -289,6 +334,7 @@ button:focus-visible {
   border-bottom: 1px solid var(--line);
   font-size: 0.95rem;
 }
+.summary-row-name { flex: 1; }
 
 /* ============================== SETTINGS ================================= */
 .settings-back {
@@ -379,4 +425,65 @@ button:focus-visible {
   font-weight: 800;
   font-size: 1.1rem;
   font-variant-numeric: tabular-nums;
+}
+
+/* ================================ STATS ================================= */
+.stats-svg {
+  width: 100%;
+  height: auto;
+  margin: 0.5rem 0 1.2rem;
+}
+.stats-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+}
+.stats-area {
+  fill: rgba(230, 57, 70, 0.16);
+  fill: color-mix(in srgb, var(--accent) 16%, transparent);
+  stroke: none;
+}
+.stats-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.stats-dot {
+  fill: var(--bg);
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+.stats-dot-today {
+  fill: var(--accent);
+}
+.stats-axis-label {
+  font-size: 9px;
+  fill: var(--ink-soft);
+}
+
+.stats-summary {
+  display: flex;
+  gap: 0.6rem;
+}
+.stats-summary-item {
+  flex: 1;
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.9rem 0.6rem;
+  text-align: center;
+}
+.stats-summary-value {
+  display: block;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.stats-summary-label {
+  display: block;
+  font-size: 0.72rem;
+  color: var(--ink-soft);
+  margin-top: 0.2rem;
 }

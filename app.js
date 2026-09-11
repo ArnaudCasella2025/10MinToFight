@@ -22,19 +22,32 @@ const STORAGE_WORKOUT_PREFIX = "10mtf:workout:";
 const STORAGE_HISTORY_KEY = "10mtf:history";
 const STORAGE_PREFS_KEY = "10mtf:prefs";
 const STORAGE_VARIANT_PREFIX = "10mtf:variant:";
+const STORAGE_COMPLETIONS_KEY = "10mtf:completions";
 
 const MAX_WEIGHT = 3;
 const DEFAULT_WEIGHTS = { endurance: 1, muscu: 1, souplesse: 1, combat: 1 };
+
+const MAX_DIFFICULTY = 4;
+const STATS_WINDOW_DAYS = 14;
 
 /* -------------------------------------------------------------------------
  * Utilitaires : date, RNG déterministe par jour, stockage local
  * ---------------------------------------------------------------------- */
 function todayIso() {
-  const d = new Date();
+  return isoFromDate(new Date());
+}
+
+function isoFromDate(d) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+function addDaysIso(iso, delta) {
+  const d = new Date(iso + "T00:00:00");
+  d.setDate(d.getDate() + delta);
+  return isoFromDate(d);
 }
 
 function hashSeed(text) {
@@ -122,6 +135,33 @@ function bumpVariant(date) {
   const next = getVariant(date) + 1;
   writeJson(STORAGE_VARIANT_PREFIX + date, next);
   return next;
+}
+
+/* -------------------------------------------------------------------------
+ * Complétions (pour l'écran Stats) : score du jour = somme des difficultés
+ * des exercices d'un entraînement effectivement terminé. Un jour sans
+ * entraînement terminé vaut 0.
+ * ---------------------------------------------------------------------- */
+function getCompletions() {
+  return readJson(STORAGE_COMPLETIONS_KEY, {}); // { "2026-09-10": { score, count } }
+}
+
+function recordCompletion(date, exercises) {
+  const completions = getCompletions();
+  const score = exercises.reduce((sum, e) => sum + (e.difficulty || 0), 0);
+  completions[date] = { score, count: exercises.length };
+  writeJson(STORAGE_COMPLETIONS_KEY, completions);
+}
+
+function getStatsSeries(days) {
+  const completions = getCompletions();
+  const today = todayIso();
+  const series = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const date = addDaysIso(today, -i);
+    series.push({ date, score: completions[date] ? completions[date].score : 0 });
+  }
+  return series;
 }
 
 /* -------------------------------------------------------------------------
@@ -259,6 +299,7 @@ const screens = {
   player: document.getElementById("player-screen"),
   summary: document.getElementById("summary-screen"),
   settings: document.getElementById("settings-screen"),
+  stats: document.getElementById("stats-screen"),
 };
 
 function showScreen(name) {
@@ -270,6 +311,13 @@ function showScreen(name) {
 function pastilleHtml(category) {
   const meta = CATEGORY_META[category];
   return `<span class="pastille pastille-${category}" aria-hidden="true">${meta.emoji}</span>`;
+}
+
+function difficultyGaugeHtml(level) {
+  const bars = [1, 2, 3, 4]
+    .map((n) => `<span class="diff-bar${n <= level ? " filled" : ""}"></span>`)
+    .join("");
+  return `<span class="diff-gauge" role="img" aria-label="Difficulté ${level} sur 4">${bars}</span>`;
 }
 
 /* ---- Écran d'accueil ---- */
@@ -303,7 +351,10 @@ function renderHomeList() {
       ${pastilleHtml(exercise.category)}
       <div class="home-row-text">
         <span class="home-row-index">${index + 1}. ${exercise.name}</span>
-        <span class="home-row-category">${CATEGORY_META[exercise.category].label}</span>
+        <div class="home-row-meta">
+          <span class="home-row-category">${CATEGORY_META[exercise.category].label}</span>
+          ${difficultyGaugeHtml(exercise.difficulty)}
+        </div>
       </div>
     `;
     list.appendChild(li);
@@ -406,6 +457,75 @@ function renderRadar(weights) {
   svg.innerHTML = svgContent;
 }
 
+/* ---- Écran Stats ---- */
+function openStats() {
+  renderStats();
+  showScreen("stats");
+}
+
+function renderStats() {
+  const series = getStatsSeries(STATS_WINDOW_DAYS);
+  const scores = series.map((s) => s.score);
+
+  const today = scores[scores.length - 1];
+  const best = Math.max(...scores, 0);
+  let streak = 0;
+  for (let i = scores.length - 1; i >= 0 && scores[i] > 0; i--) streak++;
+
+  document.getElementById("stats-today").textContent = today;
+  document.getElementById("stats-best").textContent = best;
+  document.getElementById("stats-streak").textContent = streak;
+
+  renderStatsChart(series);
+}
+
+function renderStatsChart(series) {
+  const svg = document.getElementById("stats-svg");
+  const width = 320;
+  const height = 180;
+  const padLeft = 10;
+  const padRight = 10;
+  const padTop = 14;
+  const padBottom = 26;
+  const plotWidth = width - padLeft - padRight;
+  const plotHeight = height - padTop - padBottom;
+  const maxScore = WORKOUT_SIZE * MAX_DIFFICULTY; // plafond fixe (40) : un entraînement "parfait" en difficulté
+  const stepX = plotWidth / (series.length - 1);
+
+  const xFor = (i) => padLeft + i * stepX;
+  const yFor = (score) => padTop + plotHeight - (Math.min(score, maxScore) / maxScore) * plotHeight;
+
+  let svgContent = "";
+
+  // Grille horizontale (0%, 50%, 100% du score max théorique)
+  [0, 0.5, 1].forEach((frac) => {
+    const y = padTop + plotHeight - frac * plotHeight;
+    svgContent += `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" class="stats-grid" />`;
+  });
+
+  const linePoints = series.map((s, i) => `${xFor(i)},${yFor(s.score)}`).join(" ");
+  const areaPoints = `${xFor(0)},${yFor(0)} ${linePoints} ${xFor(series.length - 1)},${yFor(0)}`;
+  svgContent += `<polygon points="${areaPoints}" class="stats-area" />`;
+  svgContent += `<polyline points="${linePoints}" class="stats-line" />`;
+
+  series.forEach((s, i) => {
+    const isToday = i === series.length - 1;
+    svgContent += `<circle cx="${xFor(i)}" cy="${yFor(s.score)}" r="${isToday ? 4 : 2.5}" class="stats-dot${isToday ? " stats-dot-today" : ""}" />`;
+  });
+
+  series.forEach((s, i) => {
+    const isLast = i === series.length - 1;
+    const showLabel = isLast || (i % 3 === 0 && i < series.length - 2);
+    if (!showLabel) return;
+    const d = new Date(s.date + "T00:00:00");
+    const label = d.toLocaleDateString("fr-FR", { day: "numeric", month: "numeric" });
+    svgContent += `<text x="${xFor(i)}" y="${height - 6}" class="stats-axis-label" text-anchor="middle">${label}</text>`;
+  });
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.innerHTML = svgContent;
+}
+
 /* ---- Écran d'entraînement (player) ---- */
 let session = null; // { index, phase, secondsLeft, timerHandle }
 
@@ -486,6 +606,10 @@ function renderPlayer() {
   pastille.textContent = CATEGORY_META[exercise.category].emoji;
 
   document.getElementById("player-name").textContent = exercise.name;
+  document.getElementById("player-meta").innerHTML = `
+    <span class="player-category">${CATEGORY_META[exercise.category].label}</span>
+    ${difficultyGaugeHtml(exercise.difficulty)}
+  `;
   document.getElementById("player-description").textContent = exercise.description;
   document.getElementById("player-phase-label").textContent =
     session.phase === "work" ? "INTENSE" : "RÉCUP";
@@ -507,14 +631,19 @@ function finishWorkout() {
   if (session && session.timerHandle) clearInterval(session.timerHandle);
   session = null;
 
+  recordCompletion(todayIso(), todayWorkout);
+
   const list = document.getElementById("summary-list");
   list.innerHTML = "";
+  let totalScore = 0;
   todayWorkout.forEach((exercise) => {
+    totalScore += exercise.difficulty || 0;
     const li = document.createElement("li");
     li.className = "summary-row";
-    li.innerHTML = `${pastilleHtml(exercise.category)}<span>${exercise.name}</span>`;
+    li.innerHTML = `${pastilleHtml(exercise.category)}<span class="summary-row-name">${exercise.name}</span>${difficultyGaugeHtml(exercise.difficulty)}`;
     list.appendChild(li);
   });
+  document.getElementById("summary-score").textContent = totalScore;
 
   showScreen("summary");
 }
@@ -532,6 +661,8 @@ document.getElementById("regenerate-button").addEventListener("click", regenerat
 document.getElementById("settings-button").addEventListener("click", openSettings);
 document.getElementById("settings-back-button").addEventListener("click", () => showScreen("home"));
 document.getElementById("settings-save-button").addEventListener("click", saveSettings);
+document.getElementById("stats-button").addEventListener("click", openStats);
+document.getElementById("stats-back-button").addEventListener("click", () => showScreen("home"));
 
 renderHome();
 showScreen("home");
