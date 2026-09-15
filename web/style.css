@@ -271,6 +271,18 @@ button:focus-visible {
 .phase-work .timer-ring { border-color: var(--work); }
 .phase-rest .timer-ring { border-color: var(--rest); }
 
+.pause-button {
+  width: 100%;
+  max-width: 14rem;
+  padding: 0.7rem;
+  font-size: 0.95rem;
+}
+.paused .pause-button {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
 .timer-seconds {
   font-size: 3.6rem;
   font-weight: 800;
@@ -285,6 +297,14 @@ button:focus-visible {
 }
 .phase-work .timer-phase { color: var(--work); }
 .phase-rest .timer-phase { color: var(--rest); }
+
+/* .paused rules come last so they win over .phase-work/.phase-rest regardless
+   of which phase is active when the workout is paused (same specificity). */
+.paused .timer-ring {
+  border-color: var(--ink-soft);
+  opacity: 0.6;
+}
+.paused .timer-phase { color: var(--ink-soft); }
 
 .player-next {
   min-height: 1.3em;
