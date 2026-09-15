@@ -527,11 +527,11 @@ function renderStatsChart(series) {
 }
 
 /* ---- Écran d'entraînement (player) ---- */
-let session = null; // { index, phase, secondsLeft, timerHandle }
+let session = null; // { index, phase, secondsLeft, timerHandle, paused }
 
 function startWorkout() {
   unlockAudioForMobile();
-  session = { index: 0, phase: "work", secondsLeft: WORK_SECONDS };
+  session = { index: 0, phase: "work", secondsLeft: WORK_SECONDS, paused: false };
   showScreen("player");
   renderPlayer();
   const first = todayWorkout[0];
@@ -546,8 +546,31 @@ function quitWorkout() {
   showScreen("home");
 }
 
-function tick() {
+function togglePause() {
   if (!session) return;
+  if (session.paused) resumeWorkout();
+  else pauseWorkout();
+}
+
+function pauseWorkout() {
+  if (!session || session.paused) return;
+  clearInterval(session.timerHandle);
+  session.timerHandle = null;
+  session.paused = true;
+  if ("speechSynthesis" in window) window.speechSynthesis.pause();
+  renderPlayer();
+}
+
+function resumeWorkout() {
+  if (!session || !session.paused) return;
+  session.paused = false;
+  if ("speechSynthesis" in window) window.speechSynthesis.resume();
+  session.timerHandle = setInterval(tick, 1000);
+  renderPlayer();
+}
+
+function tick() {
+  if (!session || session.paused) return;
   session.secondsLeft -= 1;
   const remaining = session.secondsLeft;
 
@@ -597,6 +620,7 @@ function renderPlayer() {
   const root = document.getElementById("player-screen");
   root.classList.toggle("phase-work", session.phase === "work");
   root.classList.toggle("phase-rest", session.phase === "rest");
+  root.classList.toggle("paused", session.paused);
 
   document.getElementById("player-progress").textContent =
     `Exercice ${session.index + 1} / ${todayWorkout.length}`;
@@ -611,9 +635,15 @@ function renderPlayer() {
     ${difficultyGaugeHtml(exercise.difficulty)}
   `;
   document.getElementById("player-description").textContent = exercise.description;
-  document.getElementById("player-phase-label").textContent =
-    session.phase === "work" ? "INTENSE" : "RÉCUP";
+  document.getElementById("player-phase-label").textContent = session.paused
+    ? "EN PAUSE"
+    : session.phase === "work"
+      ? "INTENSE"
+      : "RÉCUP";
   document.getElementById("player-seconds").textContent = session.secondsLeft;
+
+  const pauseButton = document.getElementById("pause-button");
+  pauseButton.textContent = session.paused ? "▶ Reprendre" : "⏸ Pause";
 
   if (session.phase === "rest") {
     const isLastExercise = session.index === todayWorkout.length - 1;
@@ -653,6 +683,7 @@ function finishWorkout() {
  * ---------------------------------------------------------------------- */
 document.getElementById("start-button").addEventListener("click", startWorkout);
 document.getElementById("quit-button").addEventListener("click", quitWorkout);
+document.getElementById("pause-button").addEventListener("click", togglePause);
 document.getElementById("restart-button").addEventListener("click", () => {
   showScreen("home");
   renderHome();
