@@ -25,8 +25,9 @@ const STORAGE_DIFFICULTY_PREFS_KEY = "10mtf:difficulty-prefs";
 const STORAGE_VARIANT_PREFIX = "10mtf:variant:";
 const STORAGE_COMPLETIONS_KEY = "10mtf:completions";
 
-const MAX_WEIGHT = 3;
-const DEFAULT_WEIGHTS = { endurance: 1, muscu: 1, souplesse: 1, combat: 1 };
+const PERCENT_TOTAL = 100;
+const FREQUENCY_STEP = 5;
+const DEFAULT_WEIGHTS = { endurance: 25, muscu: 25, souplesse: 25, combat: 25 };
 
 const MAX_DIFFICULTY = 4;
 const MIN_DIFFICULTY = 1;
@@ -125,11 +126,49 @@ function getRecentIds(beforeDate) {
   return seen;
 }
 
+/**
+ * Arrondit un jeu de valeurs (une par catégorie) en entiers dont la somme
+ * fait exactement 100, par la méthode du plus grand reste (même principe
+ * que computeQuotas, mais pour des pourcentages plutôt que des créneaux).
+ */
+function roundPercentTotal(values) {
+  const floors = {};
+  let assigned = 0;
+  const items = CATEGORIES.map((cat) => {
+    const v = Math.max(0, values[cat] || 0);
+    const floor = Math.floor(v);
+    floors[cat] = floor;
+    assigned += floor;
+    return { cat, frac: v - floor };
+  });
+  let remaining = PERCENT_TOTAL - assigned;
+  const ordered = items.slice().sort((a, b) => b.frac - a.frac);
+  for (let i = 0; i < remaining; i++) {
+    floors[ordered[i % ordered.length].cat]++;
+  }
+  return floors;
+}
+
+/**
+ * Ramène un jeu de poids quelconque (y compris d'anciennes préférences en
+ * points 0..3) à des pourcentages entiers dont la somme fait 100.
+ */
+function normalizeToPercent(weights) {
+  const total = CATEGORIES.reduce((sum, cat) => sum + Math.max(0, weights[cat] || 0), 0);
+  if (total <= 0) return { ...DEFAULT_WEIGHTS };
+  const scaled = {};
+  CATEGORIES.forEach((cat) => {
+    scaled[cat] = (Math.max(0, weights[cat] || 0) / total) * PERCENT_TOTAL;
+  });
+  return roundPercentTotal(scaled);
+}
+
 function getPreferences() {
   const stored = readJson(STORAGE_PREFS_KEY, null);
   if (!stored) return { ...DEFAULT_WEIGHTS };
-  // merge with defaults so any new category added later doesn't end up undefined
-  return { ...DEFAULT_WEIGHTS, ...stored };
+  // merge avec les défauts (nouvelle catégorie) puis normalise en % (migre
+  // aussi d'anciennes préférences enregistrées en points 0..3)
+  return normalizeToPercent({ ...DEFAULT_WEIGHTS, ...stored });
 }
 
 function savePreferences(weights) {
@@ -404,9 +443,35 @@ function openSettings() {
   showScreen("settings");
 }
 
-function adjustWeight(category, delta) {
-  const next = Math.min(MAX_WEIGHT, Math.max(0, (draftWeights[category] || 0) + delta));
-  draftWeights = { ...draftWeights, [category]: next };
+/**
+ * Ajuste la fréquence (en %) d'une catégorie et répartit la différence sur
+ * les 3 autres au prorata de leur part actuelle, pour que le total des 4
+ * catégories fasse toujours 100%.
+ */
+function adjustFrequency(category, delta) {
+  const current = draftWeights[category] || 0;
+  const target = Math.min(PERCENT_TOTAL, Math.max(0, current + delta));
+  const appliedDelta = target - current;
+  if (appliedDelta === 0) return;
+
+  const others = CATEGORIES.filter((cat) => cat !== category);
+  const othersTotal = others.reduce((sum, cat) => sum + (draftWeights[cat] || 0), 0);
+  const toDistribute = -appliedDelta;
+
+  const next = { ...draftWeights, [category]: target };
+  if (othersTotal > 0) {
+    others.forEach((cat) => {
+      const w = draftWeights[cat] || 0;
+      next[cat] = Math.max(0, w + (toDistribute * w) / othersTotal);
+    });
+  } else {
+    const share = toDistribute / others.length;
+    others.forEach((cat) => {
+      next[cat] = Math.max(0, share);
+    });
+  }
+
+  draftWeights = roundPercentTotal(next);
   renderSettings();
 }
 
@@ -454,7 +519,7 @@ function renderSettings() {
         <span class="settings-control-label">Fréquence</span>
         <div class="stepper">
           <button type="button" class="stepper-btn" data-action="dec" data-cat="${category}" aria-label="Diminuer la fréquence de ${meta.label}">−</button>
-          <span class="stepper-value">${value}</span>
+          <span class="stepper-value">${value}%</span>
           <button type="button" class="stepper-btn" data-action="inc" data-cat="${category}" aria-label="Augmenter la fréquence de ${meta.label}">+</button>
         </div>
       </div>
@@ -468,8 +533,8 @@ function renderSettings() {
 
   rows.querySelectorAll(".stepper-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const delta = btn.dataset.action === "inc" ? 1 : -1;
-      adjustWeight(btn.dataset.cat, delta);
+      const delta = btn.dataset.action === "inc" ? FREQUENCY_STEP : -FREQUENCY_STEP;
+      adjustFrequency(btn.dataset.cat, delta);
     });
   });
 
@@ -491,21 +556,22 @@ function renderRadar(weights) {
 
   function pointFor(index, value) {
     const angle = -Math.PI / 2 + index * ((2 * Math.PI) / axisCount);
-    const radius = (value / MAX_WEIGHT) * maxRadius;
+    const radius = (value / PERCENT_TOTAL) * maxRadius;
     return [cx + radius * Math.cos(angle), cy + radius * Math.sin(angle)];
   }
 
   let svgContent = "";
 
-  // Anneaux de fond (échelle 0..MAX_WEIGHT)
-  for (let ring = 1; ring <= MAX_WEIGHT; ring++) {
+  // Anneaux de fond (échelle 0..100%, par pas de 25%)
+  const ringStep = 25;
+  for (let ring = ringStep; ring <= PERCENT_TOTAL; ring += ringStep) {
     const points = CATEGORIES.map((_, i) => pointFor(i, ring).join(",")).join(" ");
     svgContent += `<polygon points="${points}" class="radar-ring" />`;
   }
 
   // Axes
   CATEGORIES.forEach((_, i) => {
-    const [x, y] = pointFor(i, MAX_WEIGHT);
+    const [x, y] = pointFor(i, PERCENT_TOTAL);
     svgContent += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" class="radar-axis" />`;
   });
 
@@ -519,7 +585,7 @@ function renderRadar(weights) {
 
   // Labels (emoji) au-delà de l'anneau externe
   CATEGORIES.forEach((cat, i) => {
-    const [x, y] = pointFor(i, MAX_WEIGHT + 0.65);
+    const [x, y] = pointFor(i, PERCENT_TOTAL + 22);
     svgContent += `<text x="${x}" y="${y}" class="radar-label" text-anchor="middle" dominant-baseline="middle">${CATEGORY_META[cat].emoji}</text>`;
   });
 
