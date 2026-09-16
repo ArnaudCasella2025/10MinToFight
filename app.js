@@ -33,6 +33,10 @@ const DEFAULT_WEIGHTS = { endurance: 25, muscu: 25, souplesse: 25, combat: 25 };
 const MAX_DIFFICULTY = 4;
 const MIN_DIFFICULTY = 1;
 const DEFAULT_TARGET_DIFFICULTY = 2;
+// Poids relatif d'un exercice à distance D du niveau cible = DECAY^-D : plus D
+// grandit, plus l'exercice devient rare sans jamais être strictement exclu
+// (niveau visé = majoritaire, ±1 = fréquent, ±2 = rare, ±3 = extrêmement rare).
+const DIFFICULTY_WEIGHT_DECAY = 4;
 const DEFAULT_DIFFICULTY_PREFS = {
   endurance: DEFAULT_TARGET_DIFFICULTY,
   muscu: DEFAULT_TARGET_DIFFICULTY,
@@ -279,25 +283,54 @@ function computeQuotas(weights, random) {
 }
 
 /**
+ * Tire, sans remise, `count` exercices d'une liste : chacun a une chance
+ * proportionnelle à DIFFICULTY_WEIGHT_DECAY^-|difficulté - cible| d'être pris,
+ * donc le niveau visé sort majoritairement mais un écart reste toujours
+ * possible (jamais un tri strict "les plus proches d'abord").
+ */
+function weightedSampleWithoutReplacement(list, count, random, targetDifficulty) {
+  const pool = list.slice();
+  const picked = [];
+  while (pool.length > 0 && picked.length < count) {
+    const weights = pool.map((e) => Math.pow(DIFFICULTY_WEIGHT_DECAY, -Math.abs(e.difficulty - targetDifficulty)));
+    const total = weights.reduce((sum, w) => sum + w, 0);
+    let r = random() * total;
+    let index = weights.length - 1;
+    for (let i = 0; i < weights.length; i++) {
+      r -= weights[i];
+      if (r <= 0) {
+        index = i;
+        break;
+      }
+    }
+    picked.push(pool[index]);
+    pool.splice(index, 1);
+  }
+  return picked;
+}
+
+/**
  * Choisit `count` exercices dans une catégorie : priorité aux exercices non
- * utilisés récemment (comme avant), puis parmi ceux-là (et parmi les
- * "récents" si on doit y puiser faute d'assez de frais) on préfère ceux dont
- * la difficulté est la plus proche du niveau cible réglé dans les paramètres
- * — sauf si `randomDifficulty` est activé pour la catégorie, auquel cas la
- * difficulté n'entre pas en compte et la sélection reste purement aléatoire.
+ * utilisés récemment (comme avant) — on ne pioche dans les "récents" que
+ * s'il n'y a pas assez de frais. Au sein de chaque groupe, la difficulté
+ * cible réglée dans les paramètres oriente un tirage pondéré (pas un tri
+ * strict), sauf si `randomDifficulty` est activé pour la catégorie, auquel
+ * cas la difficulté n'entre pas en compte et la sélection reste uniforme.
  */
 function pickForCategory(category, count, recentIds, random, targetDifficulty, randomDifficulty) {
   const all = exercisesByCategory(category);
-  const rankByDifficulty = (list) => {
-    const shuffled = seededShuffle(list, random);
-    if (randomDifficulty) return shuffled;
-    return shuffled.sort(
-      (a, b) => Math.abs(a.difficulty - targetDifficulty) - Math.abs(b.difficulty - targetDifficulty),
-    );
-  };
-  const fresh = rankByDifficulty(all.filter((e) => !recentIds.has(e.id)));
-  const stale = rankByDifficulty(all.filter((e) => recentIds.has(e.id)));
-  return [...fresh, ...stale].slice(0, count);
+  const fresh = seededShuffle(all.filter((e) => !recentIds.has(e.id)), random);
+  const stale = seededShuffle(all.filter((e) => recentIds.has(e.id)), random);
+
+  if (randomDifficulty) {
+    return [...fresh, ...stale].slice(0, count);
+  }
+
+  const pickedFresh = weightedSampleWithoutReplacement(fresh, count, random, targetDifficulty);
+  const remaining = count - pickedFresh.length;
+  const pickedStale =
+    remaining > 0 ? weightedSampleWithoutReplacement(stale, remaining, random, targetDifficulty) : [];
+  return [...pickedFresh, ...pickedStale];
 }
 
 function generateWorkout(date, { force = false } = {}) {
