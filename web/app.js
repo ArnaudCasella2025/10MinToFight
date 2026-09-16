@@ -22,6 +22,7 @@ const STORAGE_WORKOUT_PREFIX = "10mtf:workout:";
 const STORAGE_HISTORY_KEY = "10mtf:history";
 const STORAGE_PREFS_KEY = "10mtf:prefs";
 const STORAGE_DIFFICULTY_PREFS_KEY = "10mtf:difficulty-prefs";
+const STORAGE_DIFFICULTY_RANDOM_KEY = "10mtf:difficulty-random";
 const STORAGE_VARIANT_PREFIX = "10mtf:variant:";
 const STORAGE_COMPLETIONS_KEY = "10mtf:completions";
 
@@ -38,6 +39,8 @@ const DEFAULT_DIFFICULTY_PREFS = {
   souplesse: DEFAULT_TARGET_DIFFICULTY,
   combat: DEFAULT_TARGET_DIFFICULTY,
 };
+// true = difficulté tirée au hasard pour cette catégorie (jauge ignorée)
+const DEFAULT_DIFFICULTY_RANDOM = { endurance: false, muscu: false, souplesse: false, combat: false };
 const STATS_WINDOW_DAYS = 14;
 
 /* -------------------------------------------------------------------------
@@ -185,6 +188,16 @@ function saveDifficultyPreferences(targets) {
   writeJson(STORAGE_DIFFICULTY_PREFS_KEY, targets);
 }
 
+function getDifficultyRandomPreferences() {
+  const stored = readJson(STORAGE_DIFFICULTY_RANDOM_KEY, null);
+  if (!stored) return { ...DEFAULT_DIFFICULTY_RANDOM };
+  return { ...DEFAULT_DIFFICULTY_RANDOM, ...stored };
+}
+
+function saveDifficultyRandomPreferences(flags) {
+  writeJson(STORAGE_DIFFICULTY_RANDOM_KEY, flags);
+}
+
 function getVariant(date) {
   return readJson(STORAGE_VARIANT_PREFIX + date, 0);
 }
@@ -269,14 +282,19 @@ function computeQuotas(weights, random) {
  * Choisit `count` exercices dans une catégorie : priorité aux exercices non
  * utilisés récemment (comme avant), puis parmi ceux-là (et parmi les
  * "récents" si on doit y puiser faute d'assez de frais) on préfère ceux dont
- * la difficulté est la plus proche du niveau cible réglé dans les paramètres.
+ * la difficulté est la plus proche du niveau cible réglé dans les paramètres
+ * — sauf si `randomDifficulty` est activé pour la catégorie, auquel cas la
+ * difficulté n'entre pas en compte et la sélection reste purement aléatoire.
  */
-function pickForCategory(category, count, recentIds, random, targetDifficulty) {
+function pickForCategory(category, count, recentIds, random, targetDifficulty, randomDifficulty) {
   const all = exercisesByCategory(category);
-  const rankByDifficulty = (list) =>
-    seededShuffle(list, random).sort(
+  const rankByDifficulty = (list) => {
+    const shuffled = seededShuffle(list, random);
+    if (randomDifficulty) return shuffled;
+    return shuffled.sort(
       (a, b) => Math.abs(a.difficulty - targetDifficulty) - Math.abs(b.difficulty - targetDifficulty),
     );
+  };
   const fresh = rankByDifficulty(all.filter((e) => !recentIds.has(e.id)));
   const stale = rankByDifficulty(all.filter((e) => recentIds.has(e.id)));
   return [...fresh, ...stale].slice(0, count);
@@ -293,12 +311,20 @@ function generateWorkout(date, { force = false } = {}) {
   const recentIds = getRecentIds(date);
   const weights = getPreferences();
   const difficultyTargets = getDifficultyPreferences();
+  const difficultyRandom = getDifficultyRandomPreferences();
   const quotas = computeQuotas(weights, random);
 
   let selected = [];
   for (const category of CATEGORIES) {
     selected = selected.concat(
-      pickForCategory(category, quotas[category], recentIds, random, difficultyTargets[category]),
+      pickForCategory(
+        category,
+        quotas[category],
+        recentIds,
+        random,
+        difficultyTargets[category],
+        difficultyRandom[category],
+      ),
     );
   }
   const workout = seededShuffle(selected, random);
@@ -435,10 +461,12 @@ function renderHomeList() {
 /* ---- Écran paramètres (radar de préférences) ---- */
 let draftWeights = getPreferences();
 let draftDifficulty = getDifficultyPreferences();
+let draftDifficultyRandom = getDifficultyRandomPreferences();
 
 function openSettings() {
   draftWeights = getPreferences();
   draftDifficulty = getDifficultyPreferences();
+  draftDifficultyRandom = getDifficultyRandomPreferences();
   renderSettings();
   showScreen("settings");
 }
@@ -477,18 +505,25 @@ function adjustFrequency(category, delta) {
 
 function setTargetDifficulty(category, level) {
   draftDifficulty = { ...draftDifficulty, [category]: level };
+  draftDifficultyRandom = { ...draftDifficultyRandom, [category]: false };
+  renderSettings();
+}
+
+function setRandomDifficulty(category) {
+  draftDifficultyRandom = { ...draftDifficultyRandom, [category]: true };
   renderSettings();
 }
 
 function saveSettings() {
   savePreferences(draftWeights);
   saveDifficultyPreferences(draftDifficulty);
+  saveDifficultyRandomPreferences(draftDifficultyRandom);
   todayWorkout = generateWorkout(todayIso(), { force: true });
   renderHome();
   showScreen("home");
 }
 
-function difficultyGaugeInputHtml(category, level) {
+function difficultyGaugeInputHtml(category, level, isRandom) {
   const bars = [1, 2, 3, 4]
     .map(
       (n) => `
@@ -498,7 +533,14 @@ function difficultyGaugeInputHtml(category, level) {
     `,
     )
     .join("");
-  return `<div class="diff-gauge-input">${bars}</div>`;
+  return `<div class="diff-gauge-input${isRandom ? " is-dimmed" : ""}">${bars}</div>`;
+}
+
+function randomDifficultyButtonHtml(category, isRandom) {
+  return `
+    <button type="button" class="diff-random-btn${isRandom ? " active" : ""}" data-cat="${category}"
+      aria-pressed="${isRandom}" aria-label="Difficulté aléatoire pour ${CATEGORY_META[category].label}">🎲</button>
+  `;
 }
 
 function renderSettings() {
@@ -508,6 +550,7 @@ function renderSettings() {
     const meta = CATEGORY_META[category];
     const value = draftWeights[category] || 0;
     const targetDifficulty = draftDifficulty[category] || DEFAULT_TARGET_DIFFICULTY;
+    const isRandom = !!draftDifficultyRandom[category];
     const card = document.createElement("div");
     card.className = "settings-card";
     card.innerHTML = `
@@ -525,7 +568,10 @@ function renderSettings() {
       </div>
       <div class="settings-control-row">
         <span class="settings-control-label">Difficulté</span>
-        ${difficultyGaugeInputHtml(category, targetDifficulty)}
+        <div class="diff-control">
+          ${difficultyGaugeInputHtml(category, targetDifficulty, isRandom)}
+          ${randomDifficultyButtonHtml(category, isRandom)}
+        </div>
       </div>
     `;
     rows.appendChild(card);
@@ -541,6 +587,12 @@ function renderSettings() {
   rows.querySelectorAll(".diff-gauge-input-bar").forEach((btn) => {
     btn.addEventListener("click", () => {
       setTargetDifficulty(btn.dataset.cat, Number(btn.dataset.level));
+    });
+  });
+
+  rows.querySelectorAll(".diff-random-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setRandomDifficulty(btn.dataset.cat);
     });
   });
 
