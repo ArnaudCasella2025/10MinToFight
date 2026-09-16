@@ -97,6 +97,46 @@ const EXERCISES = [
   { id: "etirement-epaules", name: "Étirement épaules et triceps", category: "souplesse", difficulty: 1,
     description: "Bras au-dessus de la tête, coude plié, tirez doucement derrière la nuque." },
 
+  // Adducteurs
+  { id: "etirement-grenouille", name: "Étirement grenouille", category: "souplesse", difficulty: 2,
+    description: "À quatre pattes, écartez largement les genoux, chevilles alignées avec les genoux. Reculez doucement le bassin vers les talons pour étirer l'intérieur des cuisses." },
+  { id: "fente-laterale-cosaque", name: "Fente latérale (Cosaque)", category: "souplesse", difficulty: 3,
+    description: "Jambes très écartées, pliez un genou en gardant l'autre jambe tendue, pied à plat. Basculez le poids d'un côté à l'autre pour étirer les adducteurs en dynamique." },
+  { id: "grand-ecart-lateral", name: "Grand écart latéral progressif", category: "souplesse", difficulty: 4,
+    description: "Jambes écartées au maximum de votre mobilité, mains au sol devant vous, laissez le bassin descendre progressivement pour approfondir l'étirement des adducteurs." },
+
+  // Déplacements animaliers
+  { id: "deplacement-ours", name: "Déplacement de l'ours", category: "souplesse", difficulty: 3,
+    description: "À quatre pattes, genoux légèrement décollés du sol, avancez en faisant bouger la main et le pied opposés ensemble, dos plat et hanches basses." },
+  { id: "deplacement-crabe", name: "Déplacement du crabe", category: "souplesse", difficulty: 3,
+    description: "Assis, mains derrière vous, bassin décollé du sol. Déplacez-vous sur les mains et les pieds en gardant les hanches hautes et le dos droit." },
+  { id: "deplacement-canard", name: "Déplacement du canard", category: "souplesse", difficulty: 3,
+    description: "Descendez en squat profond, talons au sol si possible, et avancez à petits pas en restant bas, genoux vers l'extérieur." },
+  { id: "deplacement-lezard", name: "Déplacement du lézard", category: "souplesse", difficulty: 3,
+    description: "En fente basse très ouverte, mains au sol à l'intérieur du pied avant, avancez en alternant les côtés comme un lézard qui rampe, hanches proches du sol." },
+  { id: "la-chenille", name: "La chenille", category: "souplesse", difficulty: 2,
+    description: "Debout, pliez le buste et posez les mains au sol, marchez avec les mains vers l'avant jusqu'à la planche, puis ramenez les pieds vers les mains jambes tendues." },
+
+  // Postures de yoga
+  { id: "yoga-guerrier-2", name: "Posture du guerrier II", category: "souplesse", difficulty: 2,
+    description: "Jambes écartées, genou avant plié à 90°, bras tendus à l'horizontale. Regard vers la main avant, hanches ouvertes sur le côté, maintenez la position." },
+  { id: "yoga-arbre", name: "Posture de l'arbre", category: "souplesse", difficulty: 2,
+    description: "En équilibre sur une jambe, posez le pied opposé contre la cheville, le mollet ou la cuisse (jamais sur le genou), mains jointes devant la poitrine." },
+  { id: "yoga-pigeon", name: "Posture du pigeon", category: "souplesse", difficulty: 3,
+    description: "Genou avant plié devant vous, tibia proche de l'horizontale, jambe arrière tendue derrière. Penchez le buste vers l'avant pour approfondir l'ouverture de hanche." },
+  { id: "yoga-pince-debout", name: "Pince debout", category: "souplesse", difficulty: 1,
+    description: "Debout, jambes tendues ou légèrement fléchies, laissez le buste tomber vers l'avant, tête relâchée, mains vers le sol ou les tibias." },
+  { id: "yoga-corbeau", name: "Posture du corbeau", category: "souplesse", difficulty: 4,
+    description: "Accroupi, mains au sol largeur épaules, posez les genoux sur l'arrière des bras et penchez le poids vers l'avant pour décoller les pieds du sol." },
+  { id: "yoga-demi-lune", name: "Posture de la demi-lune", category: "souplesse", difficulty: 4,
+    description: "En équilibre sur une jambe et une main au sol, levez l'autre jambe et l'autre bras à l'horizontale, corps aligné comme un T." },
+  { id: "yoga-charrue", name: "Posture de la charrue", category: "souplesse", difficulty: 3,
+    description: "Allongé sur le dos, levez les jambes puis les hanches pour amener les pieds au sol derrière la tête, mains au sol ou soutenant le bas du dos." },
+
+  // Étirements dynamiques
+  { id: "balancers-jambe", name: "Balancers de jambe dynamiques", category: "souplesse", difficulty: 2,
+    description: "Debout en appui sur un support, balancez une jambe tendue d'avant en arrière puis latéralement, amplitude progressive." },
+
   // ---------------------------------------------------------------------
   // COMBAT
   // ---------------------------------------------------------------------
