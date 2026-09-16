@@ -21,6 +21,7 @@ const CATEGORIES = Object.keys(CATEGORY_META);
 const STORAGE_WORKOUT_PREFIX = "10mtf:workout:";
 const STORAGE_HISTORY_KEY = "10mtf:history";
 const STORAGE_PREFS_KEY = "10mtf:prefs";
+const STORAGE_DIFFICULTY_PREFS_KEY = "10mtf:difficulty-prefs";
 const STORAGE_VARIANT_PREFIX = "10mtf:variant:";
 const STORAGE_COMPLETIONS_KEY = "10mtf:completions";
 
@@ -28,6 +29,14 @@ const MAX_WEIGHT = 3;
 const DEFAULT_WEIGHTS = { endurance: 1, muscu: 1, souplesse: 1, combat: 1 };
 
 const MAX_DIFFICULTY = 4;
+const MIN_DIFFICULTY = 1;
+const DEFAULT_TARGET_DIFFICULTY = 2;
+const DEFAULT_DIFFICULTY_PREFS = {
+  endurance: DEFAULT_TARGET_DIFFICULTY,
+  muscu: DEFAULT_TARGET_DIFFICULTY,
+  souplesse: DEFAULT_TARGET_DIFFICULTY,
+  combat: DEFAULT_TARGET_DIFFICULTY,
+};
 const STATS_WINDOW_DAYS = 14;
 
 /* -------------------------------------------------------------------------
@@ -127,6 +136,16 @@ function savePreferences(weights) {
   writeJson(STORAGE_PREFS_KEY, weights);
 }
 
+function getDifficultyPreferences() {
+  const stored = readJson(STORAGE_DIFFICULTY_PREFS_KEY, null);
+  if (!stored) return { ...DEFAULT_DIFFICULTY_PREFS };
+  return { ...DEFAULT_DIFFICULTY_PREFS, ...stored };
+}
+
+function saveDifficultyPreferences(targets) {
+  writeJson(STORAGE_DIFFICULTY_PREFS_KEY, targets);
+}
+
 function getVariant(date) {
   return readJson(STORAGE_VARIANT_PREFIX + date, 0);
 }
@@ -207,10 +226,20 @@ function computeQuotas(weights, random) {
   return quotas;
 }
 
-function pickForCategory(category, count, recentIds, random) {
+/**
+ * Choisit `count` exercices dans une catégorie : priorité aux exercices non
+ * utilisés récemment (comme avant), puis parmi ceux-là (et parmi les
+ * "récents" si on doit y puiser faute d'assez de frais) on préfère ceux dont
+ * la difficulté est la plus proche du niveau cible réglé dans les paramètres.
+ */
+function pickForCategory(category, count, recentIds, random, targetDifficulty) {
   const all = exercisesByCategory(category);
-  const fresh = seededShuffle(all.filter((e) => !recentIds.has(e.id)), random);
-  const stale = seededShuffle(all.filter((e) => recentIds.has(e.id)), random);
+  const rankByDifficulty = (list) =>
+    seededShuffle(list, random).sort(
+      (a, b) => Math.abs(a.difficulty - targetDifficulty) - Math.abs(b.difficulty - targetDifficulty),
+    );
+  const fresh = rankByDifficulty(all.filter((e) => !recentIds.has(e.id)));
+  const stale = rankByDifficulty(all.filter((e) => recentIds.has(e.id)));
   return [...fresh, ...stale].slice(0, count);
 }
 
@@ -224,11 +253,14 @@ function generateWorkout(date, { force = false } = {}) {
   const random = mulberry32(hashSeed(`${date}:${variant}`));
   const recentIds = getRecentIds(date);
   const weights = getPreferences();
+  const difficultyTargets = getDifficultyPreferences();
   const quotas = computeQuotas(weights, random);
 
   let selected = [];
   for (const category of CATEGORIES) {
-    selected = selected.concat(pickForCategory(category, quotas[category], recentIds, random));
+    selected = selected.concat(
+      pickForCategory(category, quotas[category], recentIds, random, difficultyTargets[category]),
+    );
   }
   const workout = seededShuffle(selected, random);
 
@@ -363,9 +395,11 @@ function renderHomeList() {
 
 /* ---- Écran paramètres (radar de préférences) ---- */
 let draftWeights = getPreferences();
+let draftDifficulty = getDifficultyPreferences();
 
 function openSettings() {
   draftWeights = getPreferences();
+  draftDifficulty = getDifficultyPreferences();
   renderSettings();
   showScreen("settings");
 }
@@ -376,11 +410,30 @@ function adjustWeight(category, delta) {
   renderSettings();
 }
 
+function setTargetDifficulty(category, level) {
+  draftDifficulty = { ...draftDifficulty, [category]: level };
+  renderSettings();
+}
+
 function saveSettings() {
   savePreferences(draftWeights);
+  saveDifficultyPreferences(draftDifficulty);
   todayWorkout = generateWorkout(todayIso(), { force: true });
   renderHome();
   showScreen("home");
+}
+
+function difficultyGaugeInputHtml(category, level) {
+  const bars = [1, 2, 3, 4]
+    .map(
+      (n) => `
+      <button type="button" class="diff-gauge-input-bar${n <= level ? " filled" : ""}"
+        data-cat="${category}" data-level="${n}"
+        aria-label="Régler la difficulté de ${CATEGORY_META[category].label} à ${n} sur 4"></button>
+    `,
+    )
+    .join("");
+  return `<div class="diff-gauge-input">${bars}</div>`;
 }
 
 function renderSettings() {
@@ -389,24 +442,40 @@ function renderSettings() {
   CATEGORIES.forEach((category) => {
     const meta = CATEGORY_META[category];
     const value = draftWeights[category] || 0;
-    const row = document.createElement("div");
-    row.className = "settings-row";
-    row.innerHTML = `
-      ${pastilleHtml(category)}
-      <span class="settings-row-label">${meta.label}</span>
-      <div class="stepper">
-        <button type="button" class="stepper-btn" data-action="dec" data-cat="${category}" aria-label="Diminuer ${meta.label}">−</button>
-        <span class="stepper-value">${value}</span>
-        <button type="button" class="stepper-btn" data-action="inc" data-cat="${category}" aria-label="Augmenter ${meta.label}">+</button>
+    const targetDifficulty = draftDifficulty[category] || DEFAULT_TARGET_DIFFICULTY;
+    const card = document.createElement("div");
+    card.className = "settings-card";
+    card.innerHTML = `
+      <div class="settings-card-head">
+        ${pastilleHtml(category)}
+        <span class="settings-row-label">${meta.label}</span>
+      </div>
+      <div class="settings-control-row">
+        <span class="settings-control-label">Fréquence</span>
+        <div class="stepper">
+          <button type="button" class="stepper-btn" data-action="dec" data-cat="${category}" aria-label="Diminuer la fréquence de ${meta.label}">−</button>
+          <span class="stepper-value">${value}</span>
+          <button type="button" class="stepper-btn" data-action="inc" data-cat="${category}" aria-label="Augmenter la fréquence de ${meta.label}">+</button>
+        </div>
+      </div>
+      <div class="settings-control-row">
+        <span class="settings-control-label">Difficulté</span>
+        ${difficultyGaugeInputHtml(category, targetDifficulty)}
       </div>
     `;
-    rows.appendChild(row);
+    rows.appendChild(card);
   });
 
   rows.querySelectorAll(".stepper-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       const delta = btn.dataset.action === "inc" ? 1 : -1;
       adjustWeight(btn.dataset.cat, delta);
+    });
+  });
+
+  rows.querySelectorAll(".diff-gauge-input-bar").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      setTargetDifficulty(btn.dataset.cat, Number(btn.dataset.level));
     });
   });
 
