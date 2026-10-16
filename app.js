@@ -23,6 +23,8 @@ const STORAGE_HISTORY_KEY = "10mtf:history";
 const STORAGE_PREFS_KEY = "10mtf:prefs";
 const STORAGE_DIFFICULTY_PREFS_KEY = "10mtf:difficulty-prefs";
 const STORAGE_DIFFICULTY_RANDOM_KEY = "10mtf:difficulty-random";
+const STORAGE_INJURIES_KEY = "10mtf:injuries";
+const STORAGE_MUSCLE_FOCUS_KEY = "10mtf:muscle-focus";
 const STORAGE_VARIANT_PREFIX = "10mtf:variant:";
 const STORAGE_COMPLETIONS_KEY = "10mtf:completions";
 
@@ -46,6 +48,34 @@ const DEFAULT_DIFFICULTY_PREFS = {
 // true = difficulté tirée au hasard pour cette catégorie (jauge ignorée)
 const DEFAULT_DIFFICULTY_RANDOM = { endurance: false, muscu: false, souplesse: false, combat: false };
 const STATS_WINDOW_DAYS = 14;
+
+const BODY_PARTS = [
+  { id: "genoux", label: "Genoux", emoji: "🦵" },
+  { id: "chevilles", label: "Chevilles", emoji: "🦶" },
+  { id: "hanches", label: "Hanches", emoji: "🦴" },
+  { id: "lombaires", label: "Lombaires", emoji: "🔻" },
+  { id: "cervicales", label: "Cervicales", emoji: "🧠" },
+  { id: "epaules", label: "Épaules", emoji: "💪" },
+  { id: "coudes", label: "Coudes", emoji: "🦾" },
+  { id: "poignets", label: "Poignets", emoji: "✋" },
+];
+const MUSCLES = [
+  { id: "abdominaux", label: "Abdominaux" },
+  { id: "obliques", label: "Obliques" },
+  { id: "fessiers", label: "Fessiers" },
+  { id: "quadriceps", label: "Quadriceps" },
+  { id: "ischio-jambiers", label: "Ischio-jambiers" },
+  { id: "adducteurs", label: "Adducteurs" },
+  { id: "mollets", label: "Mollets" },
+  { id: "pectoraux", label: "Pectoraux" },
+  { id: "dos", label: "Dos" },
+  { id: "epaules", label: "Épaules" },
+  { id: "bras", label: "Bras" },
+  { id: "hanches", label: "Hanches" },
+];
+// Multiplicateur de poids appliqué à un exercice qui cible un muscle choisi en
+// "focus" dans les paramètres — préférence, pas une exclusion stricte.
+const MUSCLE_FOCUS_BOOST = 3;
 
 /* -------------------------------------------------------------------------
  * Utilitaires : date, RNG déterministe par jour, stockage local
@@ -202,6 +232,22 @@ function saveDifficultyRandomPreferences(flags) {
   writeJson(STORAGE_DIFFICULTY_RANDOM_KEY, flags);
 }
 
+function getInjuries() {
+  return readJson(STORAGE_INJURIES_KEY, []);
+}
+
+function saveInjuries(bodyPartIds) {
+  writeJson(STORAGE_INJURIES_KEY, bodyPartIds);
+}
+
+function getMuscleFocus() {
+  return readJson(STORAGE_MUSCLE_FOCUS_KEY, []);
+}
+
+function saveMuscleFocus(muscleIds) {
+  writeJson(STORAGE_MUSCLE_FOCUS_KEY, muscleIds);
+}
+
 function getVariant(date) {
   return readJson(STORAGE_VARIANT_PREFIX + date, 0);
 }
@@ -242,8 +288,14 @@ function getStatsSeries(days) {
 /* -------------------------------------------------------------------------
  * Génération de l'entraînement du jour
  * ---------------------------------------------------------------------- */
-function exercisesByCategory(category) {
-  return EXERCISES.filter((e) => e.category === category);
+function hasIntersection(a, b) {
+  return a.some((x) => b.includes(x));
+}
+
+function exercisesByCategory(category, injuries) {
+  const all = EXERCISES.filter((e) => e.category === category);
+  if (!injuries || injuries.length === 0) return all;
+  return all.filter((e) => !hasIntersection(e.bodyParts, injuries));
 }
 
 /**
@@ -286,13 +338,19 @@ function computeQuotas(weights, random) {
  * Tire, sans remise, `count` exercices d'une liste : chacun a une chance
  * proportionnelle à DIFFICULTY_WEIGHT_DECAY^-|difficulté - cible| d'être pris,
  * donc le niveau visé sort majoritairement mais un écart reste toujours
- * possible (jamais un tri strict "les plus proches d'abord").
+ * possible (jamais un tri strict "les plus proches d'abord"). Un exercice qui
+ * cible un muscle choisi en "focus" voit son poids multiplié par
+ * MUSCLE_FOCUS_BOOST — préférence, pas une exclusion.
  */
-function weightedSampleWithoutReplacement(list, count, random, targetDifficulty) {
+function weightedSampleWithoutReplacement(list, count, random, targetDifficulty, muscleFocus) {
   const pool = list.slice();
   const picked = [];
   while (pool.length > 0 && picked.length < count) {
-    const weights = pool.map((e) => Math.pow(DIFFICULTY_WEIGHT_DECAY, -Math.abs(e.difficulty - targetDifficulty)));
+    const weights = pool.map((e) => {
+      const base = Math.pow(DIFFICULTY_WEIGHT_DECAY, -Math.abs(e.difficulty - targetDifficulty));
+      const boost = muscleFocus && muscleFocus.length > 0 && hasIntersection(e.muscles, muscleFocus) ? MUSCLE_FOCUS_BOOST : 1;
+      return base * boost;
+    });
     const total = weights.reduce((sum, w) => sum + w, 0);
     let r = random() * total;
     let index = weights.length - 1;
@@ -316,9 +374,12 @@ function weightedSampleWithoutReplacement(list, count, random, targetDifficulty)
  * cible réglée dans les paramètres oriente un tirage pondéré (pas un tri
  * strict), sauf si `randomDifficulty` est activé pour la catégorie, auquel
  * cas la difficulté n'entre pas en compte et la sélection reste uniforme.
+ * `injuries` exclut strictement les exercices qui sollicitent une zone
+ * blessée ; `muscleFocus` favorise (sans exclure) ceux qui travaillent un
+ * muscle choisi.
  */
-function pickForCategory(category, count, recentIds, random, targetDifficulty, randomDifficulty) {
-  const all = exercisesByCategory(category);
+function pickForCategory(category, count, recentIds, random, targetDifficulty, randomDifficulty, injuries, muscleFocus) {
+  const all = exercisesByCategory(category, injuries);
   const fresh = seededShuffle(all.filter((e) => !recentIds.has(e.id)), random);
   const stale = seededShuffle(all.filter((e) => recentIds.has(e.id)), random);
 
@@ -326,10 +387,10 @@ function pickForCategory(category, count, recentIds, random, targetDifficulty, r
     return [...fresh, ...stale].slice(0, count);
   }
 
-  const pickedFresh = weightedSampleWithoutReplacement(fresh, count, random, targetDifficulty);
+  const pickedFresh = weightedSampleWithoutReplacement(fresh, count, random, targetDifficulty, muscleFocus);
   const remaining = count - pickedFresh.length;
   const pickedStale =
-    remaining > 0 ? weightedSampleWithoutReplacement(stale, remaining, random, targetDifficulty) : [];
+    remaining > 0 ? weightedSampleWithoutReplacement(stale, remaining, random, targetDifficulty, muscleFocus) : [];
   return [...pickedFresh, ...pickedStale];
 }
 
@@ -345,6 +406,8 @@ function generateWorkout(date, { force = false } = {}) {
   const weights = getPreferences();
   const difficultyTargets = getDifficultyPreferences();
   const difficultyRandom = getDifficultyRandomPreferences();
+  const injuries = getInjuries();
+  const muscleFocus = getMuscleFocus();
   const quotas = computeQuotas(weights, random);
 
   let selected = [];
@@ -357,9 +420,29 @@ function generateWorkout(date, { force = false } = {}) {
         random,
         difficultyTargets[category],
         difficultyRandom[category],
+        injuries,
+        muscleFocus,
       ),
     );
   }
+
+  // Si l'exclusion des zones blessées a affamé une catégorie, on complète
+  // avec des exercices sûrs d'autres catégories pour garder 10 exercices.
+  if (selected.length < WORKOUT_SIZE) {
+    const selectedIds = new Set(selected.map((e) => e.id));
+    const safePool = CATEGORIES.flatMap((cat) => exercisesByCategory(cat, injuries)).filter(
+      (e) => !selectedIds.has(e.id),
+    );
+    const extra = weightedSampleWithoutReplacement(
+      seededShuffle(safePool, random),
+      WORKOUT_SIZE - selected.length,
+      random,
+      DEFAULT_TARGET_DIFFICULTY,
+      muscleFocus,
+    );
+    selected = selected.concat(extra);
+  }
+
   const workout = seededShuffle(selected, random);
 
   writeJson(STORAGE_WORKOUT_PREFIX + date, workout);
@@ -495,11 +578,15 @@ function renderHomeList() {
 let draftWeights = getPreferences();
 let draftDifficulty = getDifficultyPreferences();
 let draftDifficultyRandom = getDifficultyRandomPreferences();
+let draftInjuries = getInjuries();
+let draftMuscleFocus = getMuscleFocus();
 
 function openSettings() {
   draftWeights = getPreferences();
   draftDifficulty = getDifficultyPreferences();
   draftDifficultyRandom = getDifficultyRandomPreferences();
+  draftInjuries = getInjuries();
+  draftMuscleFocus = getMuscleFocus();
   renderSettings();
   showScreen("settings");
 }
@@ -551,9 +638,25 @@ function saveSettings() {
   savePreferences(draftWeights);
   saveDifficultyPreferences(draftDifficulty);
   saveDifficultyRandomPreferences(draftDifficultyRandom);
+  saveInjuries(draftInjuries);
+  saveMuscleFocus(draftMuscleFocus);
   todayWorkout = generateWorkout(todayIso(), { force: true });
   renderHome();
   showScreen("home");
+}
+
+function toggleInjury(bodyPartId) {
+  draftInjuries = draftInjuries.includes(bodyPartId)
+    ? draftInjuries.filter((id) => id !== bodyPartId)
+    : [...draftInjuries, bodyPartId];
+  renderSettings();
+}
+
+function toggleMuscleFocus(muscleId) {
+  draftMuscleFocus = draftMuscleFocus.includes(muscleId)
+    ? draftMuscleFocus.filter((id) => id !== muscleId)
+    : [...draftMuscleFocus, muscleId];
+  renderSettings();
 }
 
 function difficultyGaugeInputHtml(category, level, isRandom) {
@@ -630,6 +733,40 @@ function renderSettings() {
   });
 
   renderRadar(draftWeights);
+  renderInjuryChips();
+  renderMuscleFocusChips();
+}
+
+function renderInjuryChips() {
+  const container = document.getElementById("injuries-chips");
+  if (!container) return;
+  container.innerHTML = BODY_PARTS.map(
+    (part) => `
+      <button type="button" class="chip chip-injury${draftInjuries.includes(part.id) ? " selected" : ""}"
+        data-part="${part.id}" aria-pressed="${draftInjuries.includes(part.id)}">
+        <span aria-hidden="true">${part.emoji}</span> ${part.label}
+      </button>
+    `,
+  ).join("");
+  container.querySelectorAll(".chip-injury").forEach((btn) => {
+    btn.addEventListener("click", () => toggleInjury(btn.dataset.part));
+  });
+}
+
+function renderMuscleFocusChips() {
+  const container = document.getElementById("muscle-focus-chips");
+  if (!container) return;
+  container.innerHTML = MUSCLES.map(
+    (muscle) => `
+      <button type="button" class="chip chip-muscle${draftMuscleFocus.includes(muscle.id) ? " selected" : ""}"
+        data-muscle="${muscle.id}" aria-pressed="${draftMuscleFocus.includes(muscle.id)}">
+        ${muscle.label}
+      </button>
+    `,
+  ).join("");
+  container.querySelectorAll(".chip-muscle").forEach((btn) => {
+    btn.addEventListener("click", () => toggleMuscleFocus(btn.dataset.muscle));
+  });
 }
 
 function renderRadar(weights) {

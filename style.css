@@ -412,6 +412,43 @@ button:focus-visible {
   gap: 0.9rem;
   margin-bottom: 1.2rem;
 }
+
+.settings-subsection {
+  margin-bottom: 1.2rem;
+}
+.settings-subtitle {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0 0 0.3rem;
+}
+.chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.chip {
+  border: 1px solid var(--line);
+  background: var(--bg-raised);
+  color: var(--ink-soft);
+  border-radius: 999px;
+  padding: 0.45rem 0.85rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  line-height: 1;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+.chip-injury.selected {
+  background: color-mix(in srgb, var(--accent) 25%, var(--bg-raised));
+  border-color: var(--accent);
+  color: var(--ink);
+}
+.chip-muscle.selected {
+  background: color-mix(in srgb, #2a9d4f 30%, var(--bg-raised));
+  border-color: #2a9d4f;
+  color: var(--ink);
+}
+.chip:active { opacity: 0.7; }
+
 .settings-card {
   border: 1px solid var(--line);
   background: var(--bg-raised);
