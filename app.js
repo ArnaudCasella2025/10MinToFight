@@ -17,6 +17,15 @@ const CATEGORY_META = {
   souplesse: { emoji: "🧘‍♂️", label: "Souplesse", color: "#2a9d4f" },
 };
 const CATEGORIES = Object.keys(CATEGORY_META);
+// Couleurs utilisées pour les courbes/barres de l'écran Stats : identiques aux
+// pastilles, sauf combat (noir) remplacé par une teinte claire pour rester
+// visible sur fond sombre.
+const CATEGORY_CHART_COLOR = {
+  muscu: "#e63946",
+  endurance: "#2f7de0",
+  combat: "#f4f5f7",
+  souplesse: "#2a9d4f",
+};
 
 const STORAGE_WORKOUT_PREFIX = "10mtf:workout:";
 const STORAGE_HISTORY_KEY = "10mtf:history";
@@ -47,7 +56,6 @@ const DEFAULT_DIFFICULTY_PREFS = {
 };
 // true = difficulté tirée au hasard pour cette catégorie (jauge ignorée)
 const DEFAULT_DIFFICULTY_RANDOM = { endurance: false, muscu: false, souplesse: false, combat: false };
-const STATS_WINDOW_DAYS = 14;
 
 const BODY_PARTS = [
   { id: "genoux", label: "Genoux", emoji: "🦵" },
@@ -261,28 +269,91 @@ function bumpVariant(date) {
 /* -------------------------------------------------------------------------
  * Complétions (pour l'écran Stats) : score du jour = somme des difficultés
  * des exercices d'un entraînement effectivement terminé. Un jour sans
- * entraînement terminé vaut 0.
+ * entraînement terminé vaut 0. `categories` compte, pour ce jour-là, combien
+ * d'exercices de chaque discipline ont été faits.
  * ---------------------------------------------------------------------- */
 function getCompletions() {
-  return readJson(STORAGE_COMPLETIONS_KEY, {}); // { "2026-09-10": { score, count } }
+  return readJson(STORAGE_COMPLETIONS_KEY, {}); // { "2026-09-10": { score, count, categories } }
 }
 
 function recordCompletion(date, exercises) {
   const completions = getCompletions();
   const score = exercises.reduce((sum, e) => sum + (e.difficulty || 0), 0);
-  completions[date] = { score, count: exercises.length };
+  const categories = {};
+  CATEGORIES.forEach((cat) => {
+    categories[cat] = 0;
+  });
+  exercises.forEach((e) => {
+    categories[e.category] = (categories[e.category] || 0) + 1;
+  });
+  completions[date] = { score, count: exercises.length, categories };
   writeJson(STORAGE_COMPLETIONS_KEY, completions);
 }
 
-function getStatsSeries(days) {
+function daysInMonth(year, month) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+/** Compte par discipline, jour par jour, pour un mois donné (month = 0..11). */
+function getMonthSeries(year, month) {
   const completions = getCompletions();
-  const today = todayIso();
+  const numDays = daysInMonth(year, month);
   const series = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const date = addDaysIso(today, -i);
-    series.push({ date, score: completions[date] ? completions[date].score : 0 });
+  for (let day = 1; day <= numDays; day++) {
+    const date = `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const entry = completions[date];
+    const categories = {};
+    CATEGORIES.forEach((cat) => {
+      categories[cat] = entry && entry.categories ? entry.categories[cat] || 0 : 0;
+    });
+    series.push({ date, day, categories, total: entry ? entry.count || 0 : 0 });
   }
   return series;
+}
+
+function getCurrentStreak() {
+  const completions = getCompletions();
+  let streak = 0;
+  let d = todayIso();
+  while (completions[d] && completions[d].count > 0) {
+    streak++;
+    d = addDaysIso(d, -1);
+  }
+  return streak;
+}
+
+function getBestStreak() {
+  const completions = getCompletions();
+  const dates = Object.keys(completions)
+    .filter((d) => completions[d] && completions[d].count > 0)
+    .sort();
+  if (dates.length === 0) return 0;
+  let best = 1;
+  let current = 1;
+  for (let i = 1; i < dates.length; i++) {
+    current = addDaysIso(dates[i - 1], 1) === dates[i] ? current + 1 : 1;
+    best = Math.max(best, current);
+  }
+  return best;
+}
+
+function getAllTimeTotals() {
+  const completions = getCompletions();
+  const totals = { workouts: 0, exercises: 0, score: 0, categories: {} };
+  CATEGORIES.forEach((cat) => {
+    totals.categories[cat] = 0;
+  });
+  Object.values(completions).forEach((entry) => {
+    if (!entry || !entry.count) return;
+    totals.workouts += 1;
+    totals.exercises += entry.count;
+    totals.score += entry.score || 0;
+    const cats = entry.categories || {};
+    CATEGORIES.forEach((cat) => {
+      totals.categories[cat] += cats[cat] || 0;
+    });
+  });
+  return totals;
 }
 
 /* -------------------------------------------------------------------------
@@ -815,72 +886,188 @@ function renderRadar(weights) {
 }
 
 /* ---- Écran Stats ---- */
+let statsMonthView = currentMonthView();
+
+function currentMonthView() {
+  const d = new Date();
+  return { year: d.getFullYear(), month: d.getMonth() };
+}
+
 function openStats() {
+  statsMonthView = currentMonthView();
   renderStats();
   showScreen("stats");
 }
 
 function renderStats() {
-  const series = getStatsSeries(STATS_WINDOW_DAYS);
-  const scores = series.map((s) => s.score);
+  const completions = getCompletions();
+  const todayEntry = completions[todayIso()];
 
-  const today = scores[scores.length - 1];
-  const best = Math.max(...scores, 0);
-  let streak = 0;
-  for (let i = scores.length - 1; i >= 0 && scores[i] > 0; i--) streak++;
+  document.getElementById("stats-today").textContent = todayEntry ? todayEntry.score : 0;
+  document.getElementById("stats-streak").textContent = getCurrentStreak();
+  document.getElementById("stats-best-streak").textContent = getBestStreak();
 
-  document.getElementById("stats-today").textContent = today;
-  document.getElementById("stats-best").textContent = best;
-  document.getElementById("stats-streak").textContent = streak;
+  const totals = getAllTimeTotals();
+  document.getElementById("stats-total-workouts").textContent = totals.workouts;
+  document.getElementById("stats-total-exercises").textContent = totals.exercises;
 
-  renderStatsChart(series);
+  const favoriteCat = CATEGORIES.reduce(
+    (best, cat) => (totals.categories[cat] > (best ? totals.categories[best] : 0) ? cat : best),
+    null,
+  );
+  document.getElementById("stats-favorite").textContent =
+    favoriteCat && totals.categories[favoriteCat] > 0
+      ? `${CATEGORY_META[favoriteCat].emoji} ${CATEGORY_META[favoriteCat].label}`
+      : "—";
+
+  renderMonthChart();
+  renderHeatmap();
+  renderBreakdown(totals);
 }
 
-function renderStatsChart(series) {
-  const svg = document.getElementById("stats-svg");
-  const width = 320;
-  const height = 180;
-  const padLeft = 10;
+function changeStatsMonth(delta) {
+  let { year, month } = statsMonthView;
+  month += delta;
+  if (month < 0) {
+    month = 11;
+    year -= 1;
+  } else if (month > 11) {
+    month = 0;
+    year += 1;
+  }
+  const now = currentMonthView();
+  if (year > now.year || (year === now.year && month > now.month)) return; // pas de mois futur
+  statsMonthView = { year, month };
+  renderMonthChart();
+}
+
+function renderMonthChart() {
+  const { year, month } = statsMonthView;
+  document.getElementById("stats-month-label").textContent = new Date(year, month, 1).toLocaleDateString("fr-FR", {
+    month: "long",
+    year: "numeric",
+  });
+  const now = currentMonthView();
+  document.getElementById("stats-month-next").disabled = year === now.year && month === now.month;
+
+  const series = getMonthSeries(year, month);
+  const svg = document.getElementById("stats-month-svg");
+  const width = 340;
+  const height = 210;
+  const padLeft = 22;
   const padRight = 10;
   const padTop = 14;
-  const padBottom = 26;
+  const padBottom = 24;
   const plotWidth = width - padLeft - padRight;
   const plotHeight = height - padTop - padBottom;
-  const maxScore = WORKOUT_SIZE * MAX_DIFFICULTY; // plafond fixe (40) : un entraînement "parfait" en difficulté
-  const stepX = plotWidth / (series.length - 1);
+  const maxY = WORKOUT_SIZE; // 10 exercices/jour max
+  const stepX = series.length > 1 ? plotWidth / (series.length - 1) : plotWidth;
 
   const xFor = (i) => padLeft + i * stepX;
-  const yFor = (score) => padTop + plotHeight - (Math.min(score, maxScore) / maxScore) * plotHeight;
+  const yFor = (v) => padTop + plotHeight - (Math.min(v, maxY) / maxY) * plotHeight;
 
   let svgContent = "";
 
-  // Grille horizontale (0%, 50%, 100% du score max théorique)
   [0, 0.5, 1].forEach((frac) => {
     const y = padTop + plotHeight - frac * plotHeight;
     svgContent += `<line x1="${padLeft}" y1="${y}" x2="${width - padRight}" y2="${y}" class="stats-grid" />`;
+    svgContent += `<text x="${padLeft - 6}" y="${y + 3}" class="stats-axis-label" text-anchor="end">${Math.round(frac * maxY)}</text>`;
   });
 
-  const linePoints = series.map((s, i) => `${xFor(i)},${yFor(s.score)}`).join(" ");
-  const areaPoints = `${xFor(0)},${yFor(0)} ${linePoints} ${xFor(series.length - 1)},${yFor(0)}`;
-  svgContent += `<polygon points="${areaPoints}" class="stats-area" />`;
-  svgContent += `<polyline points="${linePoints}" class="stats-line" />`;
-
-  series.forEach((s, i) => {
-    const isToday = i === series.length - 1;
-    svgContent += `<circle cx="${xFor(i)}" cy="${yFor(s.score)}" r="${isToday ? 4 : 2.5}" class="stats-dot${isToday ? " stats-dot-today" : ""}" />`;
+  CATEGORIES.forEach((cat) => {
+    const points = series.map((s, i) => `${xFor(i)},${yFor(s.categories[cat])}`).join(" ");
+    svgContent += `<polyline points="${points}" class="stats-line" style="stroke:${CATEGORY_CHART_COLOR[cat]}" />`;
   });
 
   series.forEach((s, i) => {
-    const isLast = i === series.length - 1;
-    const showLabel = isLast || (i % 3 === 0 && i < series.length - 2);
+    const showLabel = i === 0 || i === series.length - 1 || (s.day % 5 === 0 && i < series.length - 2);
     if (!showLabel) return;
-    const d = new Date(s.date + "T00:00:00");
-    const label = d.toLocaleDateString("fr-FR", { day: "numeric", month: "numeric" });
-    svgContent += `<text x="${xFor(i)}" y="${height - 6}" class="stats-axis-label" text-anchor="middle">${label}</text>`;
+    svgContent += `<text x="${xFor(i)}" y="${height - 6}" class="stats-axis-label" text-anchor="middle">${s.day}</text>`;
   });
 
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   svg.innerHTML = svgContent;
+
+  const legend = document.getElementById("stats-month-legend");
+  legend.innerHTML = CATEGORIES.map(
+    (cat) => `
+      <span class="stats-legend-item">
+        <span class="stats-legend-dot" style="background:${CATEGORY_CHART_COLOR[cat]}"></span>
+        ${CATEGORY_META[cat].label}
+      </span>
+    `,
+  ).join("");
+}
+
+function heatColor(count) {
+  if (count <= 0) return "#262b35"; // var(--line) : case vide = jour sans entraînement, bien visible
+  const opacity = Math.min(1, 0.25 + (count / WORKOUT_SIZE) * 0.75);
+  return `rgba(230, 57, 70, ${opacity.toFixed(2)})`;
+}
+
+/** Calendrier type "heatmap" des 12 dernières semaines : rend immédiatement
+ * visibles les jours (ou séries de jours) sans entraînement. */
+function renderHeatmap() {
+  const svg = document.getElementById("stats-heatmap-svg");
+  const weeks = 12;
+  const days = weeks * 7;
+  const completions = getCompletions();
+  const today = todayIso();
+  const cellSize = 11;
+  const gap = 3;
+  const gridLeft = 20;
+  const gridTop = 12;
+  const width = gridLeft + weeks * (cellSize + gap);
+  const height = gridTop + 7 * (cellSize + gap);
+
+  let svgContent = "";
+  let lastMonth = null;
+  for (let i = 0; i < days; i++) {
+    const date = addDaysIso(today, -(days - 1 - i));
+    const entry = completions[date];
+    const count = entry ? entry.count || 0 : 0;
+    const col = Math.floor(i / 7);
+    const dow = (new Date(date + "T00:00:00").getDay() + 6) % 7; // 0 = lundi
+    const x = gridLeft + col * (cellSize + gap);
+    const y = gridTop + dow * (cellSize + gap);
+    svgContent += `<rect x="${x}" y="${y}" width="${cellSize}" height="${cellSize}" rx="2" fill="${heatColor(count)}"><title>${date} : ${count} exercice${count > 1 ? "s" : ""}</title></rect>`;
+
+    if (dow === 0) {
+      const monthKey = date.slice(0, 7);
+      if (monthKey !== lastMonth) {
+        lastMonth = monthKey;
+        const label = new Date(date + "T00:00:00").toLocaleDateString("fr-FR", { month: "short" });
+        svgContent += `<text x="${x}" y="8" class="stats-heat-label">${label}</text>`;
+      }
+    }
+  }
+
+  ["L", "", "M", "", "V", "", ""].forEach((d, i) => {
+    if (!d) return;
+    const y = gridTop + i * (cellSize + gap) + cellSize - 1;
+    svgContent += `<text x="0" y="${y}" class="stats-heat-label">${d}</text>`;
+  });
+
+  svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+  svg.innerHTML = svgContent;
+}
+
+function renderBreakdown(totals) {
+  const container = document.getElementById("stats-breakdown");
+  const total = CATEGORIES.reduce((sum, cat) => sum + totals.categories[cat], 0);
+  container.innerHTML = CATEGORIES.map((cat) => {
+    const count = totals.categories[cat];
+    const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+    return `
+      <div class="stats-breakdown-row">
+        <span class="stats-breakdown-label">${pastilleHtml(cat)} ${CATEGORY_META[cat].label}</span>
+        <div class="stats-breakdown-bar-track">
+          <div class="stats-breakdown-bar-fill" style="width:${pct}%;background:${CATEGORY_CHART_COLOR[cat]}"></div>
+        </div>
+        <span class="stats-breakdown-value">${count}</span>
+      </div>
+    `;
+  }).join("");
 }
 
 /* ---- Écran d'entraînement (player) ---- */
@@ -1051,6 +1238,8 @@ document.getElementById("settings-back-button").addEventListener("click", () => 
 document.getElementById("settings-save-button").addEventListener("click", saveSettings);
 document.getElementById("stats-button").addEventListener("click", openStats);
 document.getElementById("stats-back-button").addEventListener("click", () => showScreen("home"));
+document.getElementById("stats-month-prev").addEventListener("click", () => changeStatsMonth(-1));
+document.getElementById("stats-month-next").addEventListener("click", () => changeStatsMonth(1));
 
 renderHome();
 showScreen("home");

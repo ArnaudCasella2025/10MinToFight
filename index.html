@@ -96,24 +96,63 @@
     <button id="stats-back-button" class="btn-quit settings-back">← Retour</button>
 
     <h2 class="settings-title">Statistiques</h2>
-    <p class="settings-sub">Score du jour = somme des difficultés des exercices d'un entraînement terminé. 0 si rien n'a été terminé ce jour-là.</p>
-
-    <svg id="stats-svg" class="stats-svg" viewBox="0 0 320 180" aria-hidden="true"></svg>
+    <p class="settings-sub">Votre régularité et la répartition de vos entraînements.</p>
 
     <div class="stats-summary">
       <div class="stats-summary-item">
         <span class="stats-summary-value" id="stats-today">0</span>
-        <span class="stats-summary-label">Aujourd'hui</span>
-      </div>
-      <div class="stats-summary-item">
-        <span class="stats-summary-value" id="stats-best">0</span>
-        <span class="stats-summary-label">Meilleur score</span>
+        <span class="stats-summary-label">Score du jour</span>
       </div>
       <div class="stats-summary-item">
         <span class="stats-summary-value" id="stats-streak">0</span>
         <span class="stats-summary-label">Série en cours</span>
       </div>
+      <div class="stats-summary-item">
+        <span class="stats-summary-value" id="stats-best-streak">0</span>
+        <span class="stats-summary-label">Meilleure série</span>
+      </div>
     </div>
+
+    <div class="stats-summary">
+      <div class="stats-summary-item">
+        <span class="stats-summary-value" id="stats-total-workouts">0</span>
+        <span class="stats-summary-label">Séances</span>
+      </div>
+      <div class="stats-summary-item">
+        <span class="stats-summary-value" id="stats-total-exercises">0</span>
+        <span class="stats-summary-label">Exercices</span>
+      </div>
+      <div class="stats-summary-item">
+        <span class="stats-summary-value" id="stats-favorite">—</span>
+        <span class="stats-summary-label">Discipline favorite</span>
+      </div>
+    </div>
+
+    <section class="stats-block">
+      <div class="stats-block-head">
+        <h3 class="settings-subtitle">Vue mensuelle</h3>
+        <div class="stats-month-nav">
+          <button type="button" id="stats-month-prev" class="stats-nav-btn" aria-label="Mois précédent">←</button>
+          <span id="stats-month-label" class="stats-month-label"></span>
+          <button type="button" id="stats-month-next" class="stats-nav-btn" aria-label="Mois suivant">→</button>
+        </div>
+      </div>
+      <p class="settings-sub">Nombre d'exercices par discipline, par jour.</p>
+      <svg id="stats-month-svg" class="stats-svg" viewBox="0 0 340 210" aria-hidden="true"></svg>
+      <div id="stats-month-legend" class="stats-legend"></div>
+    </section>
+
+    <section class="stats-block">
+      <h3 class="settings-subtitle">Régularité (12 dernières semaines)</h3>
+      <p class="settings-sub">Chaque case est un jour : plus c'est coloré, plus vous avez fait d'exercices ce jour-là.</p>
+      <svg id="stats-heatmap-svg" class="stats-heatmap-svg" aria-hidden="true"></svg>
+    </section>
+
+    <section class="stats-block">
+      <h3 class="settings-subtitle">Répartition par discipline</h3>
+      <p class="settings-sub">Total d'exercices réalisés depuis le début, toutes séances confondues.</p>
+      <div id="stats-breakdown" class="stats-breakdown"></div>
+    </section>
   </section>
 
   <script src="exercises.js"></script>
